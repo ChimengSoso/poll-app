@@ -53,7 +53,7 @@ chmod +x /opt/poll-app/backend/poll-app.jar
 
 # Setup systemd service
 echo "Setting up backend service..."
-cp systemd/poll-app-backend.service /etc/systemd/system/
+cp ./poll-app-backend.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable poll-app-backend
 systemctl start poll-app-backend
