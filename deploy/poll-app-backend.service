@@ -1,0 +1,16 @@
+[Unit]
+Description=Poll App Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=pollapp
+WorkingDirectory=/opt/poll-app/backend
+ExecStart=/usr/bin/java -Xmx512m -Xms256m -jar /opt/poll-app/backend/poll-app.jar
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
