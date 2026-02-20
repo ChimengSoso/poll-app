@@ -8,7 +8,7 @@ import type { ColDef } from 'ag-grid-community';
 import { pollApi } from '../services/api';
 import { pollUpdateService } from '../services/pollUpdateService';
 import { EditPollModal } from './EditPollModal';
-import type { Poll, Restaurant } from '../types';
+import type { Poll } from '../types';
 
 interface PollListProps {
   refreshTrigger: number;

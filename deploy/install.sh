@@ -44,8 +44,8 @@ mkdir -p /opt/poll-app/frontend
 
 # Copy files
 echo "Copying application files..."
-cp backend/poll-app.jar /opt/poll-app/backend/
-cp -r frontend/* /opt/poll-app/frontend/
+cp ../backend/poll-app.jar /opt/poll-app/backend/
+cp -r ../frontend/dist/* /opt/poll-app/frontend/
 
 # Set permissions
 chown -R pollapp:pollapp /opt/poll-app

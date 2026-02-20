@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Form, Input, Button, Space, Card, message, Radio, Divider } from 'antd';
+import { Form, Input, Button, Space, Card, message, Radio } from 'antd';
 import { MinusCircleOutlined, PlusOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons';
 import { pollApi } from '../services/api';
 import { useUser } from '../contexts/UserContext';

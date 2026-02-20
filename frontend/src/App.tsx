@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Layout, Tabs, Typography, Button } from 'antd';
 import { LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import { UserProvider, useUser } from './contexts/UserContext';
