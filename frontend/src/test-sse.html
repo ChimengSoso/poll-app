@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SSE Test</title>
+</head>
+<body>
+    <h1>SSE Connection Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+
+        console.log('Attempting to connect to SSE...');
+        const eventSource = new EventSource('http://localhost:8080/api/polls/updates');
+
+        eventSource.onopen = () => {
+            console.log('SSE connection opened');
+            statusDiv.textContent = 'Connected!';
+            statusDiv.style.color = 'green';
+        };
+
+        eventSource.addEventListener('poll-update', (event) => {
+            console.log('Received poll-update:', event.data);
+            const msg = document.createElement('div');
+            msg.textContent = 'Update: ' + event.data;
+            messagesDiv.appendChild(msg);
+        });
+
+        eventSource.onerror = (error) => {
+            console.error('SSE error:', error);
+            statusDiv.textContent = 'Connection error!';
+            statusDiv.style.color = 'red';
+        };
+    </script>
+</body>
+</html>
