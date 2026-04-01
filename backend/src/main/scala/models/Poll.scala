@@ -23,14 +23,19 @@ case class Poll(
   active: Boolean = true,
   votingMode: VotingMode = VotingMode.Multiple,
   createdBy: String = "anonymous",
-  voters: Set[String] = Set.empty  // All users who have voted in this poll
+  voters: Set[String] = Set.empty,       // All users who have voted in this poll
+  dailyReset: Boolean = false,
+  titleTemplate: Option[String] = None,  // e.g. "Lunch Poll {date}"
+  lastResetDate: Option[String] = None   // ISO date of last auto-reset
 )
 
 case class CreatePollRequest(
   title: String,
   restaurants: List[RestaurantInput],
   votingMode: String = "multiple",  // "single" or "multiple"
-  createdBy: String
+  createdBy: String,
+  dailyReset: Boolean,
+  titleTemplate: Option[String]
 )
 
 case class RestaurantInput(
@@ -43,9 +48,16 @@ case class VoteRequest(
   username: String
 )
 
+case class RemoveVoteRequest(
+  restaurantId: String,
+  username: String
+)
+
 case class EditPollRequest(
   title: String,
-  restaurants: List[RestaurantInput]
+  restaurants: List[RestaurantInput],
+  dailyReset: Boolean,
+  titleTemplate: Option[String]
 )
 
 case class PollResponse(
@@ -56,8 +68,10 @@ case class PollResponse(
   active: Boolean,
   votingMode: String,
   createdBy: String,
-  voters: List[String],  // List of all users who voted
-  deleted: Boolean = false
+  voters: List[String],
+  deleted: Boolean = false,
+  dailyReset: Boolean = false,
+  titleTemplate: Option[String] = None
 )
 
 case class ErrorResponse(message: String)

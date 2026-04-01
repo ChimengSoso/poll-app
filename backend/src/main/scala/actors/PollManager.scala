@@ -12,7 +12,8 @@ object PollManager:
   case class GetPoll(pollId: String, replyTo: ActorRef[GetPollResponse]) extends Command
   case class GetAllPolls(replyTo: ActorRef[GetAllPollsResponse]) extends Command
   case class VotePoll(pollId: String, restaurantId: String, username: String, replyTo: ActorRef[VotePollResponse]) extends Command
-  case class EditPoll(pollId: String, title: String, restaurants: List[Restaurant], replyTo: ActorRef[EditPollResponse]) extends Command
+  case class RemovePollVote(pollId: String, restaurantId: String, username: String, replyTo: ActorRef[RemovePollVoteResponse]) extends Command
+  case class EditPoll(pollId: String, title: String, restaurants: List[Restaurant], dailyReset: Boolean, titleTemplate: Option[String], replyTo: ActorRef[EditPollResponse]) extends Command
   case class ResetPollVotes(pollId: String, replyTo: ActorRef[ResetPollResponse]) extends Command
   case class DeletePoll(pollId: String, replyTo: ActorRef[DeletePollResponse]) extends Command
   case class Subscribe(subscriber: ActorRef[PollUpdate]) extends Command
@@ -24,6 +25,11 @@ object PollManager:
     pollId: String,
     response: PollActor.VoteResponse,
     originalReplyTo: ActorRef[VotePollResponse]
+  ) extends Command
+
+  private case class WrappedRemoveVoteResponse(
+    response: PollActor.RemoveVoteResponse,
+    originalReplyTo: ActorRef[RemovePollVoteResponse]
   ) extends Command
 
   private case class WrappedPollResponse(
@@ -54,6 +60,10 @@ object PollManager:
   sealed trait VotePollResponse
   case class VoteSuccess(poll: PollResponse) extends VotePollResponse
   case class VoteFailure(message: String) extends VotePollResponse
+
+  sealed trait RemovePollVoteResponse
+  case class RemoveVoteSuccess(poll: PollResponse) extends RemovePollVoteResponse
+  case class RemoveVoteFailure(message: String) extends RemovePollVoteResponse
 
   sealed trait ResetPollResponse
   case class ResetSuccess(poll: PollResponse) extends ResetPollResponse
@@ -94,7 +104,9 @@ object PollManager:
               title = request.title,
               restaurants = request.restaurants.map(r => Restaurant(name = r.name, description = r.description)),
               votingMode = votingMode,
-              createdBy = request.createdBy
+              createdBy = request.createdBy,
+              dailyReset = request.dailyReset,
+              titleTemplate = request.titleTemplate
             )
             val pollActor = context.spawn(PollActor(poll), s"poll-${poll.id}")
             polls += (poll.id -> pollActor)
@@ -112,10 +124,12 @@ object PollManager:
               votingModeStr,
               poll.createdBy,
               List.empty,
-              false
+              false,
+              poll.dailyReset,
+              poll.titleTemplate
             )
             replyTo ! PollCreated(pollResponse)
-            notifySubscribers(pollResponse)  // Notify all subscribers about new poll
+            notifySubscribers(pollResponse)
             Behaviors.same
 
           case GetPoll(pollId, replyTo) =>
@@ -139,7 +153,6 @@ object PollManager:
               replyTo ! GetAllPollsResponse(List.empty)
               Behaviors.same
             else
-              // Collect all poll responses
               var responses = List[PollResponse]()
               var remaining = polls.size
 
@@ -170,9 +183,30 @@ object PollManager:
             response match
               case PollActor.VoteSuccess(poll) =>
                 originalReplyTo ! VoteSuccess(poll)
-                notifySubscribers(poll)  // Notify all subscribers about the update
+                notifySubscribers(poll)
               case PollActor.VoteFailure(message) =>
                 originalReplyTo ! VoteFailure(message)
+            Behaviors.same
+
+          case RemovePollVote(pollId, restaurantId, username, replyTo) =>
+            polls.get(pollId) match
+              case Some(pollActor) =>
+                val responseAdapter = context.messageAdapter[PollActor.RemoveVoteResponse] { response =>
+                  WrappedRemoveVoteResponse(response, replyTo)
+                }
+                pollActor ! PollActor.RemoveVote(restaurantId, username, responseAdapter)
+                Behaviors.same
+              case None =>
+                replyTo ! RemoveVoteFailure(s"Poll with id $pollId not found")
+                Behaviors.same
+
+          case WrappedRemoveVoteResponse(response, originalReplyTo) =>
+            response match
+              case PollActor.RemoveVoteSuccess(poll) =>
+                originalReplyTo ! RemoveVoteSuccess(poll)
+                notifySubscribers(poll)
+              case PollActor.RemoveVoteFailure(message) =>
+                originalReplyTo ! RemoveVoteFailure(message)
             Behaviors.same
 
           case ResetPollVotes(pollId, replyTo) =>
@@ -189,16 +223,16 @@ object PollManager:
 
           case WrappedResetResponse(response, originalReplyTo) =>
             originalReplyTo ! ResetSuccess(response)
-            notifySubscribers(response)  // Notify all subscribers about the reset
+            notifySubscribers(response)
             Behaviors.same
 
-          case EditPoll(pollId, title, restaurants, replyTo) =>
+          case EditPoll(pollId, title, restaurants, dailyReset, titleTemplate, replyTo) =>
             polls.get(pollId) match
               case Some(pollActor) =>
                 val responseAdapter = context.messageAdapter[PollActor.EditPollResponse] { response =>
                   WrappedEditResponse(response, replyTo)
                 }
-                pollActor ! PollActor.EditPoll(title, restaurants, responseAdapter)
+                pollActor ! PollActor.EditPoll(title, restaurants, dailyReset, titleTemplate, responseAdapter)
                 Behaviors.same
               case None =>
                 replyTo ! EditFailure(s"Poll with id $pollId not found")
@@ -208,7 +242,7 @@ object PollManager:
             response match
               case PollActor.EditSuccess(poll) =>
                 originalReplyTo ! EditSuccess(poll)
-                notifySubscribers(poll)  // Notify all subscribers about the edit
+                notifySubscribers(poll)
               case PollActor.EditFailure(message) =>
                 originalReplyTo ! EditFailure(message)
             Behaviors.same
@@ -216,16 +250,13 @@ object PollManager:
           case DeletePoll(pollId, replyTo) =>
             polls.get(pollId) match
               case Some(pollActor) =>
-                // Get poll data before deleting
                 val responseAdapter = context.messageAdapter[PollResponse] { response =>
-                  // Save as template
                   TemplateService.saveTemplate(response) match
                     case scala.util.Success(fileName) =>
                       println(s"Saved template: $fileName")
                     case scala.util.Failure(ex) =>
                       println(s"Failed to save template: ${ex.getMessage}")
 
-                  // Create deleted poll response
                   val deletedResponse = response.copy(deleted = true)
                   notifySubscribers(deletedResponse)
                   WrappedPollResponse(response, context.system.ignoreRef)
