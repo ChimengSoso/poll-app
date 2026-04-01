@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Input, Button, Space, message } from 'antd';
+import { Modal, Form, Input, Button, Space, Switch, message } from 'antd';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { pollApi } from '../services/api';
 import type { Poll, EditPollRequest } from '../types';
@@ -15,6 +15,8 @@ export const EditPollModal: React.FC<EditPollModalProps> = ({ poll, visible, onC
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
 
+  const dailyResetValue = Form.useWatch('dailyReset', form);
+
   useEffect(() => {
     if (poll && visible) {
       form.setFieldsValue({
@@ -23,6 +25,8 @@ export const EditPollModal: React.FC<EditPollModalProps> = ({ poll, visible, onC
           name: r.name,
           description: r.description || '',
         })),
+        dailyReset: poll.dailyReset,
+        titleTemplate: poll.titleTemplate || '',
       });
     }
   }, [poll, visible, form]);
@@ -35,6 +39,8 @@ export const EditPollModal: React.FC<EditPollModalProps> = ({ poll, visible, onC
       const request: EditPollRequest = {
         title: values.title,
         restaurants: values.restaurants || [],
+        dailyReset: values.dailyReset || false,
+        titleTemplate: values.dailyReset ? (values.titleTemplate || null) : null,
       };
 
       const updatedPoll = await pollApi.editPoll(poll!.id, request);
@@ -42,9 +48,8 @@ export const EditPollModal: React.FC<EditPollModalProps> = ({ poll, visible, onC
       onSuccess(updatedPoll);
       onClose();
     } catch (error: any) {
-      if (error.response) {
-        message.error(error.response?.data?.message || 'Failed to update poll');
-      }
+      if (error.errorFields) return; // antd validation error, already shown inline
+      message.error(error.message || 'Failed to update poll');
     } finally {
       setLoading(false);
     }
@@ -76,6 +81,25 @@ export const EditPollModal: React.FC<EditPollModalProps> = ({ poll, visible, onC
         >
           <Input placeholder="e.g., Where should we eat lunch?" />
         </Form.Item>
+
+        <Form.Item
+          label="Daily Auto-Reset"
+          name="dailyReset"
+          valuePropName="checked"
+          tooltip="Automatically reset votes at the start of each day."
+        >
+          <Switch />
+        </Form.Item>
+
+        {dailyResetValue && (
+          <Form.Item
+            label="Title Template"
+            name="titleTemplate"
+            tooltip={`Use {date} as a placeholder for today's date, e.g. "Lunch Poll {date}".`}
+          >
+            <Input placeholder='e.g., Lunch Poll {date}' />
+          </Form.Item>
+        )}
 
         <Form.List name="restaurants">
           {(fields, { add, remove }) => (

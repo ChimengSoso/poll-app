@@ -17,6 +17,7 @@ interface VotePanelProps {
 
 export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => {
   const [voting, setVoting] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const { username } = useUser();
@@ -26,16 +27,29 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
       message.error('You must be logged in to vote');
       return;
     }
-
     try {
       setVoting(true);
       const updatedPoll = await pollApi.vote(poll.id, restaurantId, username);
       message.success('Vote recorded!');
       onVoteSuccess(updatedPoll);
     } catch (error: any) {
-      message.error(error.response?.data?.message || 'Failed to vote');
+      message.error(error.message || 'Failed to vote');
     } finally {
       setVoting(false);
+    }
+  };
+
+  const handleRemoveVote = async (restaurantId: string) => {
+    if (!username) return;
+    try {
+      setRemoving(true);
+      const updatedPoll = await pollApi.removeVote(poll.id, restaurantId, username);
+      message.success('Vote removed');
+      onVoteSuccess(updatedPoll);
+    } catch (error: any) {
+      message.error(error.message || 'Failed to remove vote');
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -46,7 +60,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
       message.success('All votes have been reset!');
       onVoteSuccess(updatedPoll);
     } catch (error: any) {
-      message.error('Failed to reset votes');
+      message.error(error.message || 'Failed to reset votes');
     } finally {
       setResetting(false);
     }
@@ -100,10 +114,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
               percent={percentage}
               size="small"
               status="active"
-              strokeColor={{
-                '0%': '#108ee9',
-                '100%': '#87d068',
-              }}
+              strokeColor={{ '0%': '#108ee9', '100%': '#87d068' }}
             />
           );
         },
@@ -127,6 +138,18 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
               >
                 {userVotedForThis ? 'Voted ✓' : 'Vote'}
               </Button>
+              {userVotedForThis && poll.active && (
+                <Popconfirm
+                  title="Remove your vote?"
+                  onConfirm={() => handleRemoveVote(restaurant.id)}
+                  okText="Remove"
+                  cancelText="Cancel"
+                >
+                  <Button size="small" danger loading={removing}>
+                    Remove
+                  </Button>
+                </Popconfirm>
+              )}
               {userVotedForThis && (
                 <Tag color="green">You voted</Tag>
               )}
@@ -135,7 +158,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
         },
       },
     ],
-    [voting, poll, username, hasUserVoted, isSingleVoteMode]
+    [voting, removing, poll, username, hasUserVoted, isSingleVoteMode]
   );
 
   return (
@@ -145,6 +168,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
           <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{poll.title}</span>
           <span style={{ fontSize: '14px', color: '#888' }}>
             Total Votes: {poll.totalVotes} | Mode: {poll.votingMode === 'single' ? 'Single Vote' : 'Multiple Votes'} | Created by: {poll.createdBy}
+            {poll.dailyReset && ' | Auto-resets daily'}
           </span>
         </Space>
       }
@@ -213,9 +237,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
         <AgGridReact
           rowData={poll.restaurants}
           columnDefs={columnDefs}
-          defaultColDef={{
-            resizable: true,
-          }}
+          defaultColDef={{ resizable: true }}
         />
       </div>
 

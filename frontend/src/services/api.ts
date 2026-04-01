@@ -1,4 +1,4 @@
-import type { Poll, CreatePollRequest, VoteRequest, PollTemplate, EditPollRequest } from '../types';
+import type { Poll, CreatePollRequest, VoteRequest, RemoveVoteRequest, PollTemplate, EditPollRequest } from '../types';
 
 const API_BASE_URL = '/api';
 
@@ -11,7 +11,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     },
   });
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    let msg = `HTTP ${response.status}: ${response.statusText}`;
+    try {
+      const body = await response.json();
+      if (body.message) msg = body.message;
+    } catch {}
+    throw new Error(msg);
   }
   if (response.status === 204 || response.headers.get('content-length') === '0') {
     return undefined as T;
@@ -32,6 +37,11 @@ export const pollApi = {
   vote: (pollId: string, restaurantId: string, username: string): Promise<Poll> => {
     const voteRequest: VoteRequest = { restaurantId, username };
     return request<Poll>(`/polls/${pollId}/vote`, { method: 'POST', body: JSON.stringify(voteRequest) });
+  },
+
+  removeVote: (pollId: string, restaurantId: string, username: string): Promise<Poll> => {
+    const removeRequest: RemoveVoteRequest = { restaurantId, username };
+    return request<Poll>(`/polls/${pollId}/vote`, { method: 'DELETE', body: JSON.stringify(removeRequest) });
   },
 
   resetVotes: (pollId: string): Promise<Poll> =>

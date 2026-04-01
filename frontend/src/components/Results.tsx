@@ -1,11 +1,9 @@
 import React, { useMemo } from 'react';
-import { Card, Statistic, Row, Col } from 'antd';
-import { AgGridReact } from 'ag-grid-react';
-import type { ColDef } from 'ag-grid-community';
-import 'ag-grid-community/styles/ag-grid.css';
-import 'ag-grid-community/styles/ag-theme-alpine.css';
+import { Card, Statistic, Row, Col, Table, Tag, Typography } from 'antd';
 import type { Poll, Restaurant } from '../types';
 import { TrophyOutlined } from '@ant-design/icons';
+
+const { Text } = Typography;
 
 interface ResultsProps {
   poll: Poll;
@@ -24,38 +22,41 @@ export const Results: React.FC<ResultsProps> = ({ poll }) => {
     return `${Math.round((votes / poll.totalVotes) * 100)}%`;
   };
 
-  const columnDefs: ColDef<Restaurant>[] = useMemo(
-    () => [
-      {
-        headerName: 'Rank',
-        valueGetter: 'node.rowIndex + 1',
-        flex: 0.5,
-      },
-      {
-        headerName: 'Restaurant',
-        field: 'name',
-        flex: 2,
-      },
-      {
-        headerName: 'Description',
-        field: 'description',
-        flex: 2,
-        valueGetter: (params) => params.data?.description || '-',
-      },
-      {
-        headerName: 'Votes',
-        field: 'votes',
-        flex: 1,
-        sort: 'desc',
-      },
-      {
-        headerName: 'Percentage',
-        flex: 1,
-        valueGetter: (params) => calculatePercentage(params.data?.votes || 0),
-      },
-    ],
+  const sortedRestaurants = useMemo(
+    () => [...poll.restaurants].sort((a, b) => b.votes - a.votes),
     [poll]
   );
+
+  const columns = [
+    {
+      title: 'Rank',
+      key: 'rank',
+      width: 70,
+      render: (_: any, __: Restaurant, index: number) => index + 1,
+    },
+    {
+      title: 'Restaurant',
+      dataIndex: 'name',
+      key: 'name',
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      render: (desc: string | undefined) => desc || '-',
+    },
+    {
+      title: 'Votes',
+      dataIndex: 'votes',
+      key: 'votes',
+      sorter: (a: Restaurant, b: Restaurant) => a.votes - b.votes,
+    },
+    {
+      title: 'Percentage',
+      key: 'percentage',
+      render: (_: any, record: Restaurant) => calculatePercentage(record.votes),
+    },
+  ];
 
   return (
     <Card title={`Results: ${poll.title}`}>
@@ -64,7 +65,7 @@ export const Results: React.FC<ResultsProps> = ({ poll }) => {
           <Col span={8}>
             <Card>
               <Statistic
-                title={winners.length === 1 ? "Winner" : "Winners (Tie)"}
+                title={winners.length === 1 ? 'Winner' : 'Winners (Tie)'}
                 value={winners.map(w => w.name).join(', ')}
                 prefix={<TrophyOutlined style={{ color: '#ffd700' }} />}
                 valueStyle={{ fontSize: winners.length > 1 ? '16px' : '24px' }}
@@ -87,15 +88,31 @@ export const Results: React.FC<ResultsProps> = ({ poll }) => {
         </Row>
       )}
 
-      <div className="ag-theme-alpine" style={{ height: 400, width: '100%' }}>
-        <AgGridReact
-          rowData={poll.restaurants}
-          columnDefs={columnDefs}
-          defaultColDef={{
-            resizable: true,
-          }}
-        />
-      </div>
+      <Table
+        dataSource={sortedRestaurants}
+        columns={columns}
+        rowKey="id"
+        pagination={false}
+        expandable={{
+          expandedRowRender: (record: Restaurant) => (
+            <div style={{ padding: '4px 0' }}>
+              {record.voters.length === 0 ? (
+                <Text type="secondary">No votes yet</Text>
+              ) : (
+                <>
+                  <Text strong style={{ marginRight: 8 }}>Voted by:</Text>
+                  {record.voters.map(voter => (
+                    <Tag key={voter} color="blue" style={{ marginBottom: 4 }}>
+                      {voter}
+                    </Tag>
+                  ))}
+                </>
+              )}
+            </div>
+          ),
+          rowExpandable: () => true,
+        }}
+      />
     </Card>
   );
 };

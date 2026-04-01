@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Form, Input, Button, Space, Card, message, Radio } from 'antd';
+import { Form, Input, Button, Space, Card, message, Radio, Switch } from 'antd';
 import { MinusCircleOutlined, PlusOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons';
 import { pollApi } from '../services/api';
 import { useUser } from '../contexts/UserContext';
@@ -15,6 +15,8 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
   const { username } = useUser();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const dailyResetValue = Form.useWatch('dailyReset', form);
+
   const onFinish = async (values: any) => {
     try {
       setLoading(true);
@@ -23,13 +25,15 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
         restaurants: values.restaurants || [],
         votingMode: values.votingMode || 'multiple',
         createdBy: username!,
+        dailyReset: values.dailyReset || false,
+        titleTemplate: values.dailyReset ? (values.titleTemplate || null) : null,
       };
       await pollApi.createPoll(request);
       message.success('Poll created successfully!');
       form.resetFields();
       onPollCreated();
     } catch (error: any) {
-      message.error(error.response?.data?.message || 'Failed to create poll');
+      message.error(error.message || 'Failed to create poll');
     } finally {
       setLoading(false);
     }
@@ -89,7 +93,6 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
     };
     reader.readAsText(file);
 
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -106,6 +109,7 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
         initialValues={{
           restaurants: [{ name: '', description: '' }],
           votingMode: 'multiple',
+          dailyReset: false,
         }}
       >
         <Form.Item
@@ -126,6 +130,25 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
             <Radio.Button value="multiple">Multiple Votes</Radio.Button>
           </Radio.Group>
         </Form.Item>
+
+        <Form.Item
+          label="Daily Auto-Reset"
+          name="dailyReset"
+          valuePropName="checked"
+          tooltip="Automatically reset votes at the start of each day. Useful for recurring daily polls."
+        >
+          <Switch />
+        </Form.Item>
+
+        {dailyResetValue && (
+          <Form.Item
+            label="Title Template"
+            name="titleTemplate"
+            tooltip={`Use {date} as a placeholder for today's date, e.g. "Lunch Poll {date}". Leave blank to keep the title unchanged on reset.`}
+          >
+            <Input placeholder='e.g., Lunch Poll {date}' />
+          </Form.Item>
+        )}
 
         <Form.List name="restaurants">
           {(fields, { add, remove }) => (

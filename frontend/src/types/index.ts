@@ -3,7 +3,7 @@ export interface Restaurant {
   name: string;
   description?: string;
   votes: number;
-  voters: string[];  // List of usernames who voted for this restaurant
+  voters: string[];
 }
 
 export interface Poll {
@@ -12,17 +12,21 @@ export interface Poll {
   restaurants: Restaurant[];
   totalVotes: number;
   active: boolean;
-  votingMode: 'single' | 'multiple';  // Voting mode
-  createdBy: string;  // Username of poll creator
-  voters: string[];  // All users who have voted in this poll
-  deleted?: boolean;  // Whether the poll has been deleted
+  votingMode: 'single' | 'multiple';
+  createdBy: string;
+  voters: string[];
+  deleted?: boolean;
+  dailyReset: boolean;
+  titleTemplate?: string | null;
 }
 
 export interface CreatePollRequest {
   title: string;
   restaurants: RestaurantInput[];
-  votingMode: string;  // "single" or "multiple"
-  createdBy: string;  // Username of creator
+  votingMode: string;
+  createdBy: string;
+  dailyReset: boolean;
+  titleTemplate: string | null;
 }
 
 export interface RestaurantInput {
@@ -32,12 +36,19 @@ export interface RestaurantInput {
 
 export interface VoteRequest {
   restaurantId: string;
-  username: string;  // Username of voter
+  username: string;
+}
+
+export interface RemoveVoteRequest {
+  restaurantId: string;
+  username: string;
 }
 
 export interface EditPollRequest {
   title: string;
   restaurants: RestaurantInput[];
+  dailyReset: boolean;
+  titleTemplate: string | null;
 }
 
 export interface ErrorResponse {
