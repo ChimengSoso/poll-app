@@ -44,6 +44,7 @@ backend/target/
 backend/project/target/
 backend/project/project/
 *.class
+backend/.bsp/sbt.json
 
 # Deployment
 deploy/backend/poll-app.jar
