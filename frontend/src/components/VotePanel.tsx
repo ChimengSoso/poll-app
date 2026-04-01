@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Card, Button, Space, message, Progress, Tag, Alert, Popconfirm } from 'antd';
-import { ReloadOutlined, EditOutlined } from '@ant-design/icons';
+import { Card, Button, Space, message, Progress, Tag, Alert, Popconfirm, List, Typography } from 'antd';
+import { ReloadOutlined, EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { AgGridReact } from 'ag-grid-react';
 import type { ColDef } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
@@ -19,8 +19,14 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
   const [voting, setVoting] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [requesting, setRequesting] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const { username } = useUser();
+
+  const isApprovalRequired = poll.requireApproval;
+  const isApproved = username ? poll.approvedVoters.includes(username) : false;
+  const isPending = username ? poll.pendingVoters.includes(username) : false;
+  const isOwner = username === poll.createdBy;
 
   const handleVote = async (choiceId: string) => {
     if (!username) {
@@ -63,6 +69,50 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
       message.error(error.message || 'Failed to reset votes');
     } finally {
       setResetting(false);
+    }
+  };
+
+  const handleRequestToVote = async () => {
+    if (!username) return;
+    try {
+      setRequesting(true);
+      const updatedPoll = await pollApi.requestToVote(poll.id, username);
+      message.success('Request sent! Waiting for owner approval.');
+      onVoteSuccess(updatedPoll);
+    } catch (error: any) {
+      message.error(error.message || 'Failed to send request');
+    } finally {
+      setRequesting(false);
+    }
+  };
+
+  const handleApproveVoter = async (voter: string) => {
+    try {
+      const updatedPoll = await pollApi.approveVoter(poll.id, voter);
+      message.success(`${voter} approved`);
+      onVoteSuccess(updatedPoll);
+    } catch (error: any) {
+      message.error(error.message || 'Failed to approve voter');
+    }
+  };
+
+  const handleRejectVoter = async (voter: string) => {
+    try {
+      const updatedPoll = await pollApi.rejectVoter(poll.id, voter);
+      message.success(`${voter} rejected`);
+      onVoteSuccess(updatedPoll);
+    } catch (error: any) {
+      message.error(error.message || 'Failed to reject voter');
+    }
+  };
+
+  const handleRevokeVoter = async (voter: string) => {
+    try {
+      const updatedPoll = await pollApi.revokeVoter(poll.id, voter);
+      message.success(`${voter} revoked`);
+      onVoteSuccess(updatedPoll);
+    } catch (error: any) {
+      message.error(error.message || 'Failed to revoke voter');
     }
   };
 
@@ -124,6 +174,23 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
         flex: 2,
         cellRenderer: (params: any) => {
           const choice = params.data;
+
+          if (isApprovalRequired && !isApproved) {
+            if (isPending) {
+              return <Tag color="orange">Pending approval</Tag>;
+            }
+            return (
+              <Button
+                size="small"
+                onClick={handleRequestToVote}
+                loading={requesting}
+                disabled={!poll.active}
+              >
+                Request to vote
+              </Button>
+            );
+          }
+
           const userVotedForThis = username ? choice.voters.includes(username) : false;
           const canVote = isSingleVoteMode ? !hasUserVoted : !userVotedForThis;
 
@@ -158,7 +225,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
         },
       },
     ],
-    [voting, removing, poll, username, hasUserVoted, isSingleVoteMode]
+    [voting, removing, requesting, poll, username, hasUserVoted, isSingleVoteMode, isApprovalRequired, isApproved, isPending]
   );
 
   return (
@@ -169,6 +236,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
           <span style={{ fontSize: '14px', color: '#888' }}>
             Total Votes: {poll.totalVotes} | Mode: {poll.votingMode === 'single' ? 'Single Vote' : 'Multiple Votes'} | Created by: {poll.createdBy}
             {poll.dailyReset && ' | Auto-resets daily'}
+            {poll.requireApproval && ' | Approval required'}
           </span>
         </Space>
       }
@@ -215,7 +283,25 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
           style={{ marginBottom: 16 }}
         />
       )}
-      {isSingleVoteMode && hasUserVoted && (
+      {isApprovalRequired && !isApproved && isPending && (
+        <Alert
+          message="Pending Approval"
+          description="Your request to vote is pending owner approval."
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
+      {isApprovalRequired && !isApproved && !isPending && (
+        <Alert
+          message="Approval Required"
+          description="This poll requires approval to vote. Click 'Request to vote' in the Action column."
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
+      {isSingleVoteMode && hasUserVoted && (!isApprovalRequired || isApproved) && (
         <Alert
           message="Single Vote Mode"
           description="You have already cast your vote. You cannot vote again or change your vote."
@@ -224,7 +310,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
           style={{ marginBottom: 16 }}
         />
       )}
-      {!isSingleVoteMode && (
+      {!isSingleVoteMode && (!isApprovalRequired || isApproved) && (
         <Alert
           message="Multiple Vote Mode"
           description="You can vote for multiple choices. Click 'Vote' on each choice you like!"
@@ -240,6 +326,76 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
           defaultColDef={{ resizable: true }}
         />
       </div>
+
+      {isOwner && isApprovalRequired && (
+        <div style={{ marginTop: 24 }}>
+          {poll.pendingVoters.length > 0 && (
+            <Card
+              size="small"
+              title={<Typography.Text strong>Pending Requests ({poll.pendingVoters.length})</Typography.Text>}
+              style={{ marginBottom: 16 }}
+            >
+              <List
+                size="small"
+                dataSource={poll.pendingVoters}
+                renderItem={(voter) => (
+                  <List.Item
+                    actions={[
+                      <Button
+                        size="small"
+                        type="primary"
+                        icon={<CheckOutlined />}
+                        onClick={() => handleApproveVoter(voter)}
+                      >
+                        Approve
+                      </Button>,
+                      <Button
+                        size="small"
+                        danger
+                        icon={<CloseOutlined />}
+                        onClick={() => handleRejectVoter(voter)}
+                      >
+                        Reject
+                      </Button>,
+                    ]}
+                  >
+                    {voter}
+                  </List.Item>
+                )}
+              />
+            </Card>
+          )}
+          {poll.approvedVoters.length > 0 && (
+            <Card
+              size="small"
+              title={<Typography.Text strong>Approved Voters ({poll.approvedVoters.length})</Typography.Text>}
+            >
+              <List
+                size="small"
+                dataSource={poll.approvedVoters}
+                renderItem={(voter) => (
+                  <List.Item
+                    actions={[
+                      <Popconfirm
+                        title={`Revoke ${voter}'s access?`}
+                        onConfirm={() => handleRevokeVoter(voter)}
+                        okText="Revoke"
+                        cancelText="Cancel"
+                      >
+                        <Button size="small" danger>
+                          Revoke
+                        </Button>
+                      </Popconfirm>,
+                    ]}
+                  >
+                    {voter}
+                  </List.Item>
+                )}
+              />
+            </Card>
+          )}
+        </div>
+      )}
 
       <EditPollModal
         poll={poll}

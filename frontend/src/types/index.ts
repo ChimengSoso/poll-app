@@ -18,6 +18,9 @@ export interface Poll {
   deleted?: boolean;
   dailyReset: boolean;
   titleTemplate?: string | null;
+  requireApproval: boolean;
+  approvedVoters: string[];
+  pendingVoters: string[];
 }
 
 export interface CreatePollRequest {
@@ -27,6 +30,7 @@ export interface CreatePollRequest {
   createdBy: string;
   dailyReset: boolean;
   titleTemplate: string | null;
+  requireApproval: boolean;
 }
 
 export interface ChoiceInput {
@@ -49,6 +53,11 @@ export interface EditPollRequest {
   choices: ChoiceInput[];
   dailyReset: boolean;
   titleTemplate: string | null;
+  requireApproval: boolean;
+}
+
+export interface VoterActionRequest {
+  username: string;
 }
 
 export interface ErrorResponse {

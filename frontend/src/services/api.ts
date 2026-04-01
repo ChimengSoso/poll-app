@@ -1,4 +1,4 @@
-import type { Poll, CreatePollRequest, VoteRequest, RemoveVoteRequest, PollTemplate, EditPollRequest } from '../types';
+import type { Poll, CreatePollRequest, VoteRequest, RemoveVoteRequest, PollTemplate, EditPollRequest, VoterActionRequest } from '../types';
 
 const API_BASE_URL = '/api';
 
@@ -55,6 +55,24 @@ export const pollApi = {
 
   deletePoll: (pollId: string): Promise<void> =>
     request<void>(`/polls/${pollId}`, { method: 'DELETE' }),
+
+  requestToVote: (pollId: string, username: string): Promise<Poll> => {
+    const body: VoterActionRequest = { username };
+    return request<Poll>(`/polls/${pollId}/request-vote`, { method: 'POST', body: JSON.stringify(body) });
+  },
+
+  approveVoter: (pollId: string, username: string): Promise<Poll> => {
+    const body: VoterActionRequest = { username };
+    return request<Poll>(`/polls/${pollId}/approve-voter`, { method: 'POST', body: JSON.stringify(body) });
+  },
+
+  rejectVoter: (pollId: string, username: string): Promise<Poll> => {
+    const body: VoterActionRequest = { username };
+    return request<Poll>(`/polls/${pollId}/reject-voter`, { method: 'POST', body: JSON.stringify(body) });
+  },
+
+  revokeVoter: (pollId: string, username: string): Promise<Poll> =>
+    request<Poll>(`/polls/${pollId}/voters/${encodeURIComponent(username)}`, { method: 'DELETE' }),
 };
 
 export const templateApi = {

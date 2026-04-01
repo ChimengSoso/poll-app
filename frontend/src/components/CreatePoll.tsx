@@ -27,6 +27,7 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
         createdBy: username!,
         dailyReset: values.dailyReset || false,
         titleTemplate: values.dailyReset ? (values.titleTemplate || null) : null,
+        requireApproval: values.requireApproval || false,
       };
       await pollApi.createPoll(request);
       message.success('Poll created successfully!');
@@ -110,6 +111,7 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
           choices: [{ name: '', description: '' }],
           votingMode: 'multiple',
           dailyReset: false,
+          requireApproval: false,
         }}
       >
         <Form.Item
@@ -136,6 +138,15 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
           name="dailyReset"
           valuePropName="checked"
           tooltip="Automatically reset votes at the start of each day. Useful for recurring daily polls."
+        >
+          <Switch />
+        </Form.Item>
+
+        <Form.Item
+          label="Require Voter Approval"
+          name="requireApproval"
+          valuePropName="checked"
+          tooltip="Users must request and be approved by the poll owner before voting."
         >
           <Switch />
         </Form.Item>
