@@ -1,4 +1,4 @@
-name := "poll-app-backend"
+name := "openpoll-backend"
 
 version := "1.0.0"
 
@@ -19,7 +19,7 @@ Compile / run / mainClass := Some("Main")
 
 // Assembly settings for fat JAR
 assembly / mainClass := Some("Main")
-assembly / assemblyJarName := "poll-app.jar"
+assembly / assemblyJarName := "openpoll.jar"
 
 // Merge strategy for assembly
 assembly / assemblyMergeStrategy := {

@@ -101,7 +101,7 @@ function MainApp() {
         alignItems: 'center'
       }}>
         <Title level={2} style={{ color: 'white', margin: '16px 0' }}>
-          🍽️ Restaurant Poll App
+          🗳️ OpenPoll
         </Title>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <span style={{ color: 'white' }}>

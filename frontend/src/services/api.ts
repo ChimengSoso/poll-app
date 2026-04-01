@@ -34,13 +34,13 @@ export const pollApi = {
   createPoll: (body: CreatePollRequest): Promise<Poll> =>
     request<Poll>('/polls', { method: 'POST', body: JSON.stringify(body) }),
 
-  vote: (pollId: string, restaurantId: string, username: string): Promise<Poll> => {
-    const voteRequest: VoteRequest = { restaurantId, username };
+  vote: (pollId: string, choiceId: string, username: string): Promise<Poll> => {
+    const voteRequest: VoteRequest = { choiceId, username };
     return request<Poll>(`/polls/${pollId}/vote`, { method: 'POST', body: JSON.stringify(voteRequest) });
   },
 
-  removeVote: (pollId: string, restaurantId: string, username: string): Promise<Poll> => {
-    const removeRequest: RemoveVoteRequest = { restaurantId, username };
+  removeVote: (pollId: string, choiceId: string, username: string): Promise<Poll> => {
+    const removeRequest: RemoveVoteRequest = { choiceId, username };
     return request<Poll>(`/polls/${pollId}/vote`, { method: 'DELETE', body: JSON.stringify(removeRequest) });
   },
 

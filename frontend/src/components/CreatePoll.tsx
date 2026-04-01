@@ -22,7 +22,7 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
       setLoading(true);
       const request: CreatePollRequest = {
         title: values.title,
-        restaurants: values.restaurants || [],
+        choices: values.choices || [],
         votingMode: values.votingMode || 'multiple',
         createdBy: username!,
         dailyReset: values.dailyReset || false,
@@ -41,14 +41,14 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
 
   const handleExport = () => {
     const values = form.getFieldsValue();
-    if (!values.title || !values.restaurants || values.restaurants.length === 0) {
+    if (!values.title || !values.choices || values.choices.length === 0) {
       message.warning('Please fill in poll details before exporting');
       return;
     }
 
     const pollData = {
       title: values.title,
-      restaurants: values.restaurants,
+      choices: values.choices,
       votingMode: values.votingMode || 'multiple',
     };
 
@@ -75,14 +75,14 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
         const content = e.target?.result as string;
         const pollData = JSON.parse(content);
 
-        if (!pollData.title || !pollData.restaurants) {
+        if (!pollData.title || !pollData.choices) {
           message.error('Invalid poll file format');
           return;
         }
 
         form.setFieldsValue({
           title: pollData.title,
-          restaurants: pollData.restaurants,
+          choices: pollData.choices,
           votingMode: pollData.votingMode || 'multiple',
         });
 
@@ -107,7 +107,7 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
         layout="vertical"
         autoComplete="off"
         initialValues={{
-          restaurants: [{ name: '', description: '' }],
+          choices: [{ name: '', description: '' }],
           votingMode: 'multiple',
           dailyReset: false,
         }}
@@ -123,7 +123,7 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
         <Form.Item
           label="Voting Mode"
           name="votingMode"
-          tooltip="Single: Each person votes once. Multiple: Each person can vote for multiple restaurants."
+          tooltip="Single: Each person votes once. Multiple: Each person can vote for multiple choices."
         >
           <Radio.Group>
             <Radio.Button value="single">Single Vote</Radio.Button>
@@ -150,7 +150,7 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
           </Form.Item>
         )}
 
-        <Form.List name="restaurants">
+        <Form.List name="choices">
           {(fields, { add, remove }) => (
             <>
               {fields.map(({ key, name, ...restField }) => (
@@ -158,9 +158,9 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
                   <Form.Item
                     {...restField}
                     name={[name, 'name']}
-                    rules={[{ required: true, message: 'Restaurant name required' }]}
+                    rules={[{ required: true, message: 'Choice name required' }]}
                   >
-                    <Input placeholder="Restaurant name" style={{ width: 200 }} />
+                    <Input placeholder="Choice" style={{ width: 200 }} />
                   </Form.Item>
                   <Form.Item
                     {...restField}
@@ -175,7 +175,7 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
               ))}
               <Form.Item>
                 <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                  Add Restaurant
+                  Add Choice
                 </Button>
               </Form.Item>
             </>

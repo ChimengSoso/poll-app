@@ -109,10 +109,10 @@ export const PollList: React.FC<PollListProps> = ({ refreshTrigger, onPollSelect
         filter: true,
       },
       {
-        headerName: 'Restaurants',
-        field: 'restaurants',
+        headerName: 'Choices',
+        field: 'choices',
         flex: 1,
-        valueGetter: (params) => params.data?.restaurants.length || 0,
+        valueGetter: (params) => params.data?.choices.length || 0,
       },
       {
         headerName: 'Total Votes',

@@ -93,7 +93,7 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command])(using system: Actor
           post {
             entity(as[VoteRequest]) { voteRequest =>
               val response: Future[PollManager.VotePollResponse] =
-                pollManager.ask(PollManager.VotePoll(pollId, voteRequest.restaurantId, voteRequest.username, _))
+                pollManager.ask(PollManager.VotePoll(pollId, voteRequest.choiceId, voteRequest.username, _))
               onSuccess(response) {
                 case PollManager.VoteSuccess(poll) =>
                   complete(StatusCodes.OK, poll)
@@ -105,7 +105,7 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command])(using system: Actor
           delete {
             entity(as[RemoveVoteRequest]) { removeRequest =>
               val response: Future[PollManager.RemovePollVoteResponse] =
-                pollManager.ask(PollManager.RemovePollVote(pollId, removeRequest.restaurantId, removeRequest.username, _))
+                pollManager.ask(PollManager.RemovePollVote(pollId, removeRequest.choiceId, removeRequest.username, _))
               onSuccess(response) {
                 case PollManager.RemoveVoteSuccess(poll) =>
                   complete(StatusCodes.OK, poll)
@@ -152,9 +152,9 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command])(using system: Actor
           } ~
           put {
             entity(as[EditPollRequest]) { editRequest =>
-              val restaurants = editRequest.restaurants.map(r => Restaurant(name = r.name, description = r.description))
+              val choices = editRequest.choices.map(r => Choice(name = r.name, description = r.description))
               val response: Future[PollManager.EditPollResponse] =
-                pollManager.ask(PollManager.EditPoll(pollId, editRequest.title, restaurants, editRequest.dailyReset, editRequest.titleTemplate, _))
+                pollManager.ask(PollManager.EditPoll(pollId, editRequest.title, choices, editRequest.dailyReset, editRequest.titleTemplate, _))
               onSuccess(response) {
                 case PollManager.EditSuccess(poll) =>
                   complete(StatusCodes.OK, poll)
@@ -190,10 +190,10 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command])(using system: Actor
           post {
             TemplateService.loadTemplate(fileName) match
               case Success(template) =>
-                val restaurants = template.restaurants.map(r => RestaurantInput(r.name, r.description))
+                val choices = template.choices.map(r => ChoiceInput(r.name, r.description))
                 val request = CreatePollRequest(
                   title = s"${template.title} (Recovered)",
-                  restaurants = restaurants,
+                  choices = choices,
                   votingMode = template.votingMode,
                   createdBy = template.createdBy,
                   dailyReset = false,

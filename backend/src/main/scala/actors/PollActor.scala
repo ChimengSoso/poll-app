@@ -8,10 +8,10 @@ import java.time.LocalDate
 object PollActor:
   sealed trait Command
   case class GetPoll(replyTo: ActorRef[PollResponse]) extends Command
-  case class Vote(restaurantId: String, username: String, replyTo: ActorRef[VoteResponse]) extends Command
-  case class RemoveVote(restaurantId: String, username: String, replyTo: ActorRef[RemoveVoteResponse]) extends Command
+  case class Vote(choiceId: String, username: String, replyTo: ActorRef[VoteResponse]) extends Command
+  case class RemoveVote(choiceId: String, username: String, replyTo: ActorRef[RemoveVoteResponse]) extends Command
   case class UpdatePoll(poll: Poll, replyTo: ActorRef[PollResponse]) extends Command
-  case class EditPoll(title: String, restaurants: List[Restaurant], dailyReset: Boolean, titleTemplate: Option[String], replyTo: ActorRef[EditPollResponse]) extends Command
+  case class EditPoll(title: String, choices: List[Choice], dailyReset: Boolean, titleTemplate: Option[String], replyTo: ActorRef[EditPollResponse]) extends Command
   case class ResetVotes(replyTo: ActorRef[PollResponse]) extends Command
 
   sealed trait VoteResponse
@@ -37,7 +37,7 @@ object PollActor:
     PollResponse(
       poll.id,
       poll.title,
-      poll.restaurants,
+      poll.choices,
       poll.totalVotes,
       poll.active,
       votingModeStr,
@@ -60,7 +60,7 @@ object PollActor:
           .getOrElse(poll.title)
         poll.copy(
           title = newTitle,
-          restaurants = poll.restaurants.map(_.copy(votes = 0, voters = List.empty)),
+          choices = poll.choices.map(_.copy(votes = 0, voters = List.empty)),
           totalVotes = 0,
           voters = Set.empty,
           lastResetDate = Some(today)
@@ -74,26 +74,26 @@ object PollActor:
           replyTo ! toPollResponse(current)
           active(current)
 
-        case Vote(restaurantId, username, replyTo) =>
+        case Vote(choiceId, username, replyTo) =>
           val current = applyDailyReset(poll)
-          current.restaurants.find(_.id == restaurantId) match
+          current.choices.find(_.id == choiceId) match
             case None =>
-              replyTo ! VoteFailure(s"Restaurant with id $restaurantId not found")
+              replyTo ! VoteFailure(s"Choice with id $choiceId not found")
               active(current)
 
-            case Some(restaurant) =>
+            case Some(choice) =>
               current.votingMode match
                 case VotingMode.Single =>
                   if current.voters.contains(username) then
                     replyTo ! VoteFailure(s"User $username has already voted in this poll (single vote mode)")
                     active(current)
                   else
-                    val updatedRestaurants = current.restaurants.map { r =>
-                      if r.id == restaurantId then r.copy(votes = r.votes + 1, voters = username :: r.voters)
+                    val updatedChoices = current.choices.map { r =>
+                      if r.id == choiceId then r.copy(votes = r.votes + 1, voters = username :: r.voters)
                       else r
                     }
                     val updatedPoll = current.copy(
-                      restaurants = updatedRestaurants,
+                      choices = updatedChoices,
                       totalVotes = current.totalVotes + 1,
                       voters = current.voters + username
                     )
@@ -101,41 +101,41 @@ object PollActor:
                     active(updatedPoll)
 
                 case VotingMode.Multiple =>
-                  if restaurant.voters.contains(username) then
-                    replyTo ! VoteFailure(s"User $username has already voted for this restaurant")
+                  if choice.voters.contains(username) then
+                    replyTo ! VoteFailure(s"User $username has already voted for this choice")
                     active(current)
                   else
-                    val updatedRestaurants = current.restaurants.map { r =>
-                      if r.id == restaurantId then r.copy(votes = r.votes + 1, voters = username :: r.voters)
+                    val updatedChoices = current.choices.map { r =>
+                      if r.id == choiceId then r.copy(votes = r.votes + 1, voters = username :: r.voters)
                       else r
                     }
                     val updatedPoll = current.copy(
-                      restaurants = updatedRestaurants,
+                      choices = updatedChoices,
                       totalVotes = current.totalVotes + 1,
                       voters = current.voters + username
                     )
                     replyTo ! VoteSuccess(toPollResponse(updatedPoll))
                     active(updatedPoll)
 
-        case RemoveVote(restaurantId, username, replyTo) =>
-          poll.restaurants.find(_.id == restaurantId) match
+        case RemoveVote(choiceId, username, replyTo) =>
+          poll.choices.find(_.id == choiceId) match
             case None =>
-              replyTo ! RemoveVoteFailure(s"Restaurant with id $restaurantId not found")
+              replyTo ! RemoveVoteFailure(s"Choice with id $choiceId not found")
               Behaviors.same
-            case Some(restaurant) =>
-              if !restaurant.voters.contains(username) then
-                replyTo ! RemoveVoteFailure(s"User $username has not voted for this restaurant")
+            case Some(choice) =>
+              if !choice.voters.contains(username) then
+                replyTo ! RemoveVoteFailure(s"User $username has not voted for this choice")
                 Behaviors.same
               else
-                val updatedRestaurants = poll.restaurants.map { r =>
-                  if r.id == restaurantId then
+                val updatedChoices = poll.choices.map { r =>
+                  if r.id == choiceId then
                     r.copy(votes = r.votes - 1, voters = r.voters.filterNot(_ == username))
                   else r
                 }
-                val stillVotingElsewhere = updatedRestaurants.exists(_.voters.contains(username))
+                val stillVotingElsewhere = updatedChoices.exists(_.voters.contains(username))
                 val updatedVoters = if stillVotingElsewhere then poll.voters else poll.voters - username
                 val updatedPoll = poll.copy(
-                  restaurants = updatedRestaurants,
+                  choices = updatedChoices,
                   totalVotes = poll.totalVotes - 1,
                   voters = updatedVoters
                 )
@@ -146,17 +146,17 @@ object PollActor:
           replyTo ! toPollResponse(newPoll)
           active(newPoll)
 
-        case EditPoll(title, restaurants, dailyReset, titleTemplate, replyTo) =>
-          val updatedRestaurants = restaurants.map { newRest =>
-            poll.restaurants.find(_.name == newRest.name) match
-              case Some(existingRest) =>
-                newRest.copy(votes = existingRest.votes, voters = existingRest.voters)
+        case EditPoll(title, choices, dailyReset, titleTemplate, replyTo) =>
+          val updatedChoices = choices.map { newChoice =>
+            poll.choices.find(_.name == newChoice.name) match
+              case Some(existingChoice) =>
+                newChoice.copy(votes = existingChoice.votes, voters = existingChoice.voters)
               case None =>
-                newRest
+                newChoice
           }
           val updatedPoll = poll.copy(
             title = title,
-            restaurants = updatedRestaurants,
+            choices = updatedChoices,
             dailyReset = dailyReset,
             titleTemplate = titleTemplate
           )
@@ -165,7 +165,7 @@ object PollActor:
 
         case ResetVotes(replyTo) =>
           val resetPoll = poll.copy(
-            restaurants = poll.restaurants.map(_.copy(votes = 0, voters = List.empty)),
+            choices = poll.choices.map(_.copy(votes = 0, voters = List.empty)),
             totalVotes = 0,
             voters = Set.empty
           )

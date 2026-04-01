@@ -8,7 +8,7 @@ import 'ag-grid-community/styles/ag-theme-alpine.css';
 import { pollApi } from '../services/api';
 import { useUser } from '../contexts/UserContext';
 import { EditPollModal } from './EditPollModal';
-import type { Poll, Restaurant } from '../types';
+import type { Poll, Choice } from '../types';
 
 interface VotePanelProps {
   poll: Poll;
@@ -22,14 +22,14 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const { username } = useUser();
 
-  const handleVote = async (restaurantId: string) => {
+  const handleVote = async (choiceId: string) => {
     if (!username) {
       message.error('You must be logged in to vote');
       return;
     }
     try {
       setVoting(true);
-      const updatedPoll = await pollApi.vote(poll.id, restaurantId, username);
+      const updatedPoll = await pollApi.vote(poll.id, choiceId, username);
       message.success('Vote recorded!');
       onVoteSuccess(updatedPoll);
     } catch (error: any) {
@@ -39,11 +39,11 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
     }
   };
 
-  const handleRemoveVote = async (restaurantId: string) => {
+  const handleRemoveVote = async (choiceId: string) => {
     if (!username) return;
     try {
       setRemoving(true);
-      const updatedPoll = await pollApi.removeVote(poll.id, restaurantId, username);
+      const updatedPoll = await pollApi.removeVote(poll.id, choiceId, username);
       message.success('Vote removed');
       onVoteSuccess(updatedPoll);
     } catch (error: any) {
@@ -74,19 +74,19 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
     return Math.round((votes / poll.totalVotes) * 100);
   };
 
-  const getWinners = (): Restaurant[] => {
-    if (poll.restaurants.length === 0) return [];
-    const maxVotes = Math.max(...poll.restaurants.map(r => r.votes));
+  const getWinners = (): Choice[] => {
+    if (poll.choices.length === 0) return [];
+    const maxVotes = Math.max(...poll.choices.map(r => r.votes));
     if (maxVotes === 0) return [];
-    return poll.restaurants.filter(r => r.votes === maxVotes);
+    return poll.choices.filter(r => r.votes === maxVotes);
   };
 
   const winners = getWinners();
 
-  const columnDefs: ColDef<Restaurant>[] = useMemo(
+  const columnDefs: ColDef<Choice>[] = useMemo(
     () => [
       {
-        headerName: 'Restaurant',
+        headerName: 'Choice',
         field: 'name',
         flex: 2,
         sortable: true,
@@ -123,8 +123,8 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
         headerName: 'Action',
         flex: 2,
         cellRenderer: (params: any) => {
-          const restaurant = params.data;
-          const userVotedForThis = username ? restaurant.voters.includes(username) : false;
+          const choice = params.data;
+          const userVotedForThis = username ? choice.voters.includes(username) : false;
           const canVote = isSingleVoteMode ? !hasUserVoted : !userVotedForThis;
 
           return (
@@ -132,7 +132,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
               <Button
                 type="primary"
                 size="small"
-                onClick={() => handleVote(restaurant.id)}
+                onClick={() => handleVote(choice.id)}
                 loading={voting}
                 disabled={!poll.active || !canVote}
               >
@@ -141,7 +141,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
               {userVotedForThis && poll.active && (
                 <Popconfirm
                   title="Remove your vote?"
-                  onConfirm={() => handleRemoveVote(restaurant.id)}
+                  onConfirm={() => handleRemoveVote(choice.id)}
                   okText="Remove"
                   cancelText="Cancel"
                 >
@@ -227,7 +227,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
       {!isSingleVoteMode && (
         <Alert
           message="Multiple Vote Mode"
-          description="You can vote for multiple restaurants. Click 'Vote' on each restaurant you like!"
+          description="You can vote for multiple choices. Click 'Vote' on each choice you like!"
           type="success"
           showIcon
           style={{ marginBottom: 16 }}
@@ -235,7 +235,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
       )}
       <div className="ag-theme-alpine" style={{ height: 400, width: '100%' }}>
         <AgGridReact
-          rowData={poll.restaurants}
+          rowData={poll.choices}
           columnDefs={columnDefs}
           defaultColDef={{ resizable: true }}
         />

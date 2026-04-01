@@ -26,7 +26,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Load username from localStorage on mount
   useEffect(() => {
-    const savedUsername = localStorage.getItem('poll-app-username');
+    const savedUsername = localStorage.getItem('openpoll-username');
     if (savedUsername) {
       setUsername(savedUsername);
     }
@@ -34,12 +34,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   const login = (newUsername: string) => {
     setUsername(newUsername);
-    localStorage.setItem('poll-app-username', newUsername);
+    localStorage.setItem('openpoll-username', newUsername);
   };
 
   const logout = () => {
     setUsername(null);
-    localStorage.removeItem('poll-app-username');
+    localStorage.removeItem('openpoll-username');
   };
 
   const value: UserContextType = {

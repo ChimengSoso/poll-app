@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Start Poll App Backend
+# Start OpenPoll Backend
 # Usage: ./start-backend.sh
 
 JAVA_OPTS="-Xmx512m -Xms256m"
-JAR_FILE="poll-app.jar"
+JAR_FILE="openpoll.jar"
 
-echo "Starting Poll App Backend..."
+echo "Starting OpenPoll Backend..."
 java $JAVA_OPTS -jar $JAR_FILE

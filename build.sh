@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Poll App Build Script for Linux Deployment
+# OpenPoll Build Script for Linux Deployment
 # This script builds both backend and frontend for production
 
 set -e  # Exit on error
 
 echo "======================================"
-echo "Building Poll App for Linux"
+echo "Building OpenPoll for Linux"
 echo "======================================"
 
 # Colors for output
@@ -18,7 +18,7 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}Building Backend...${NC}"
 cd backend
 sbt clean assembly
-echo -e "${GREEN}✓ Backend JAR created: backend/target/scala-3.3.1/poll-app.jar${NC}"
+echo -e "${GREEN}✓ Backend JAR created: backend/target/scala-3.3.1/openpoll.jar${NC}"
 cd ..
 
 # Build Frontend
@@ -37,7 +37,7 @@ mkdir -p deploy/scripts
 mkdir -p deploy/systemd
 
 # Copy backend files
-cp backend/target/scala-3.3.1/poll-app.jar deploy/backend/
+cp backend/target/scala-3.3.1/openpoll.jar deploy/backend/
 echo -e "${GREEN}✓ Backend JAR copied${NC}"
 
 # Copy frontend files
@@ -55,7 +55,7 @@ echo "======================================${NC}"
 echo ""
 echo "Deployment files are in: ./deploy/"
 echo ""
-echo "Backend JAR: deploy/backend/poll-app.jar"
+echo "Backend JAR: deploy/backend/openpoll.jar"
 echo "Frontend: deploy/frontend/"
 echo ""
 echo "Next steps:"

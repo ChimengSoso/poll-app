@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Card, Statistic, Row, Col, Table, Tag, Typography } from 'antd';
-import type { Poll, Restaurant } from '../types';
+import type { Poll, Choice } from '../types';
 import { TrophyOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -11,10 +11,10 @@ interface ResultsProps {
 
 export const Results: React.FC<ResultsProps> = ({ poll }) => {
   const winners = useMemo(() => {
-    if (poll.restaurants.length === 0) return [];
-    const maxVotes = Math.max(...poll.restaurants.map(r => r.votes));
+    if (poll.choices.length === 0) return [];
+    const maxVotes = Math.max(...poll.choices.map(r => r.votes));
     if (maxVotes === 0) return [];
-    return poll.restaurants.filter(r => r.votes === maxVotes);
+    return poll.choices.filter(r => r.votes === maxVotes);
   }, [poll]);
 
   const calculatePercentage = (votes: number): string => {
@@ -22,8 +22,8 @@ export const Results: React.FC<ResultsProps> = ({ poll }) => {
     return `${Math.round((votes / poll.totalVotes) * 100)}%`;
   };
 
-  const sortedRestaurants = useMemo(
-    () => [...poll.restaurants].sort((a, b) => b.votes - a.votes),
+  const sortedChoices = useMemo(
+    () => [...poll.choices].sort((a, b) => b.votes - a.votes),
     [poll]
   );
 
@@ -32,10 +32,10 @@ export const Results: React.FC<ResultsProps> = ({ poll }) => {
       title: 'Rank',
       key: 'rank',
       width: 70,
-      render: (_: any, __: Restaurant, index: number) => index + 1,
+      render: (_: any, __: Choice, index: number) => index + 1,
     },
     {
-      title: 'Restaurant',
+      title: 'Choice',
       dataIndex: 'name',
       key: 'name',
     },
@@ -49,12 +49,12 @@ export const Results: React.FC<ResultsProps> = ({ poll }) => {
       title: 'Votes',
       dataIndex: 'votes',
       key: 'votes',
-      sorter: (a: Restaurant, b: Restaurant) => a.votes - b.votes,
+      sorter: (a: Choice, b: Choice) => a.votes - b.votes,
     },
     {
       title: 'Percentage',
       key: 'percentage',
-      render: (_: any, record: Restaurant) => calculatePercentage(record.votes),
+      render: (_: any, record: Choice) => calculatePercentage(record.votes),
     },
   ];
 
@@ -89,12 +89,12 @@ export const Results: React.FC<ResultsProps> = ({ poll }) => {
       )}
 
       <Table
-        dataSource={sortedRestaurants}
+        dataSource={sortedChoices}
         columns={columns}
         rowKey="id"
         pagination={false}
         expandable={{
-          expandedRowRender: (record: Restaurant) => (
+          expandedRowRender: (record: Choice) => (
             <div style={{ padding: '4px 0' }}>
               {record.voters.length === 0 ? (
                 <Text type="secondary">No votes yet</Text>

@@ -39,10 +39,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         }}
       >
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{ fontSize: '64px', marginBottom: '16px' }}>🍽️</div>
-          <Title level={2} style={{ marginBottom: '8px' }}>Restaurant Poll App</Title>
+          <div style={{ fontSize: '64px', marginBottom: '16px' }}>🗳️</div>
+          <Title level={2} style={{ marginBottom: '8px' }}>OpenPoll</Title>
           <Paragraph type="secondary">
-            Enter your name to create and vote on restaurant polls
+            Create polls and vote on anything with your team
           </Paragraph>
         </div>
 

@@ -1,16 +1,16 @@
 #!/bin/bash
 
-# Quick Installation Script for Poll App on Linux
+# Quick Installation Script for OpenPoll on Linux
 # Run this script on your Linux server after transferring the deploy directory
 
 set -e
 
 echo "======================================"
-echo "Poll App - Quick Install"
+echo "OpenPoll - Quick Install"
 echo "======================================"
 
 # Check if running as root
-if [ "$EUID" -ne 0 ]; then 
+if [ "$EUID" -ne 0 ]; then
     echo "Please run as root (use sudo)"
     exit 1
 fi
@@ -44,19 +44,19 @@ mkdir -p /opt/poll-app/frontend
 
 # Copy files
 echo "Copying application files..."
-cp ../backend/poll-app.jar /opt/poll-app/backend/
+cp ../backend/openpoll.jar /opt/poll-app/backend/
 cp -r ui/* /opt/poll-app/frontend/
 
 # Set permissions
 chown -R pollapp:pollapp /opt/poll-app
-chmod +x /opt/poll-app/backend/poll-app.jar
+chmod +x /opt/poll-app/backend/openpoll.jar
 
 # Setup systemd service
 echo "Setting up backend service..."
-cp ./poll-app-backend.service /etc/systemd/system/
+cp ./openpoll-backend.service /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable poll-app-backend
-systemctl start poll-app-backend
+systemctl enable openpoll-backend
+systemctl start openpoll-backend
 
 # Setup nginx
 echo "Setting up Nginx..."
@@ -77,11 +77,11 @@ echo "======================================"
 echo "Installation Complete!"
 echo "======================================"
 echo ""
-systemctl status poll-app-backend --no-pager
+systemctl status openpoll-backend --no-pager
 echo ""
 echo "Access your app at: http://YOUR_SERVER_IP"
 echo ""
 echo "Useful commands:"
-echo "  sudo systemctl status poll-app-backend"
-echo "  sudo journalctl -u poll-app-backend -f"
-echo "  sudo systemctl restart poll-app-backend"
+echo "  sudo systemctl status openpoll-backend"
+echo "  sudo journalctl -u openpoll-backend -f"
+echo "  sudo systemctl restart openpoll-backend"

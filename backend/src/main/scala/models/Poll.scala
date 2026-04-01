@@ -4,10 +4,10 @@ import java.util.UUID
 
 // Voting mode enum
 enum VotingMode:
-  case Single   // Each user can vote for only one restaurant
-  case Multiple // Each user can vote for multiple restaurants
+  case Single   // Each user can vote for only one choice
+  case Multiple // Each user can vote for multiple choices
 
-case class Restaurant(
+case class Choice(
   id: String = UUID.randomUUID().toString,
   name: String,
   description: Option[String] = None,
@@ -18,7 +18,7 @@ case class Restaurant(
 case class Poll(
   id: String = UUID.randomUUID().toString,
   title: String,
-  restaurants: List[Restaurant] = List.empty,
+  choices: List[Choice] = List.empty,
   totalVotes: Int = 0,
   active: Boolean = true,
   votingMode: VotingMode = VotingMode.Multiple,
@@ -31,31 +31,31 @@ case class Poll(
 
 case class CreatePollRequest(
   title: String,
-  restaurants: List[RestaurantInput],
+  choices: List[ChoiceInput],
   votingMode: String = "multiple",  // "single" or "multiple"
   createdBy: String,
   dailyReset: Boolean,
   titleTemplate: Option[String]
 )
 
-case class RestaurantInput(
+case class ChoiceInput(
   name: String,
   description: Option[String]
 )
 
 case class VoteRequest(
-  restaurantId: String,
+  choiceId: String,
   username: String
 )
 
 case class RemoveVoteRequest(
-  restaurantId: String,
+  choiceId: String,
   username: String
 )
 
 case class EditPollRequest(
   title: String,
-  restaurants: List[RestaurantInput],
+  choices: List[ChoiceInput],
   dailyReset: Boolean,
   titleTemplate: Option[String]
 )
@@ -63,7 +63,7 @@ case class EditPollRequest(
 case class PollResponse(
   id: String,
   title: String,
-  restaurants: List[Restaurant],
+  choices: List[Choice],
   totalVotes: Int,
   active: Boolean,
   votingMode: String,

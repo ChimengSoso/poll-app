@@ -8,9 +8,9 @@ case class DeleteSuccessResponse(message: String)
 case class PollTemplateListItem(fileName: String, pollId: String, title: String, savedAt: Long)
 
 object JsonFormats extends DefaultJsonProtocol:
-  implicit val restaurantInputFormat: RootJsonFormat[RestaurantInput] = jsonFormat2(RestaurantInput.apply)
+  implicit val choiceInputFormat: RootJsonFormat[ChoiceInput] = jsonFormat2(ChoiceInput.apply)
   implicit val createPollRequestFormat: RootJsonFormat[CreatePollRequest] = jsonFormat6(CreatePollRequest.apply)
-  implicit val restaurantFormat: RootJsonFormat[Restaurant] = jsonFormat5(Restaurant.apply)
+  implicit val choiceFormat: RootJsonFormat[Choice] = jsonFormat5(Choice.apply)
   implicit val pollResponseFormat: RootJsonFormat[PollResponse] = jsonFormat11(PollResponse.apply)
   implicit val voteRequestFormat: RootJsonFormat[VoteRequest] = jsonFormat2(VoteRequest.apply)
   implicit val removeVoteRequestFormat: RootJsonFormat[RemoveVoteRequest] = jsonFormat2(RemoveVoteRequest.apply)

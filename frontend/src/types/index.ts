@@ -1,4 +1,4 @@
-export interface Restaurant {
+export interface Choice {
   id: string;
   name: string;
   description?: string;
@@ -9,7 +9,7 @@ export interface Restaurant {
 export interface Poll {
   id: string;
   title: string;
-  restaurants: Restaurant[];
+  choices: Choice[];
   totalVotes: number;
   active: boolean;
   votingMode: 'single' | 'multiple';
@@ -22,31 +22,31 @@ export interface Poll {
 
 export interface CreatePollRequest {
   title: string;
-  restaurants: RestaurantInput[];
+  choices: ChoiceInput[];
   votingMode: string;
   createdBy: string;
   dailyReset: boolean;
   titleTemplate: string | null;
 }
 
-export interface RestaurantInput {
+export interface ChoiceInput {
   name: string;
   description?: string;
 }
 
 export interface VoteRequest {
-  restaurantId: string;
+  choiceId: string;
   username: string;
 }
 
 export interface RemoveVoteRequest {
-  restaurantId: string;
+  choiceId: string;
   username: string;
 }
 
 export interface EditPollRequest {
   title: string;
-  restaurants: RestaurantInput[];
+  choices: ChoiceInput[];
   dailyReset: boolean;
   titleTemplate: string | null;
 }

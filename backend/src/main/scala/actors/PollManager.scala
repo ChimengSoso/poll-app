@@ -11,9 +11,9 @@ object PollManager:
   case class CreatePoll(request: CreatePollRequest, replyTo: ActorRef[CreatePollResponse]) extends Command
   case class GetPoll(pollId: String, replyTo: ActorRef[GetPollResponse]) extends Command
   case class GetAllPolls(replyTo: ActorRef[GetAllPollsResponse]) extends Command
-  case class VotePoll(pollId: String, restaurantId: String, username: String, replyTo: ActorRef[VotePollResponse]) extends Command
-  case class RemovePollVote(pollId: String, restaurantId: String, username: String, replyTo: ActorRef[RemovePollVoteResponse]) extends Command
-  case class EditPoll(pollId: String, title: String, restaurants: List[Restaurant], dailyReset: Boolean, titleTemplate: Option[String], replyTo: ActorRef[EditPollResponse]) extends Command
+  case class VotePoll(pollId: String, choiceId: String, username: String, replyTo: ActorRef[VotePollResponse]) extends Command
+  case class RemovePollVote(pollId: String, choiceId: String, username: String, replyTo: ActorRef[RemovePollVoteResponse]) extends Command
+  case class EditPoll(pollId: String, title: String, choices: List[Choice], dailyReset: Boolean, titleTemplate: Option[String], replyTo: ActorRef[EditPollResponse]) extends Command
   case class ResetPollVotes(pollId: String, replyTo: ActorRef[ResetPollResponse]) extends Command
   case class DeletePoll(pollId: String, replyTo: ActorRef[DeletePollResponse]) extends Command
   case class Subscribe(subscriber: ActorRef[PollUpdate]) extends Command
@@ -102,7 +102,7 @@ object PollManager:
 
             val poll = Poll(
               title = request.title,
-              restaurants = request.restaurants.map(r => Restaurant(name = r.name, description = r.description)),
+              choices = request.choices.map(r => Choice(name = r.name, description = r.description)),
               votingMode = votingMode,
               createdBy = request.createdBy,
               dailyReset = request.dailyReset,
@@ -118,7 +118,7 @@ object PollManager:
             val pollResponse = PollResponse(
               poll.id,
               poll.title,
-              poll.restaurants,
+              poll.choices,
               poll.totalVotes,
               poll.active,
               votingModeStr,
@@ -167,13 +167,13 @@ object PollManager:
               }
               Behaviors.same
 
-          case VotePoll(pollId, restaurantId, username, replyTo) =>
+          case VotePoll(pollId, choiceId, username, replyTo) =>
             polls.get(pollId) match
               case Some(pollActor) =>
                 val responseAdapter = context.messageAdapter[PollActor.VoteResponse] { response =>
                   WrappedVoteResponse(pollId, response, replyTo)
                 }
-                pollActor ! PollActor.Vote(restaurantId, username, responseAdapter)
+                pollActor ! PollActor.Vote(choiceId, username, responseAdapter)
                 Behaviors.same
               case None =>
                 replyTo ! VoteFailure(s"Poll with id $pollId not found")
@@ -188,13 +188,13 @@ object PollManager:
                 originalReplyTo ! VoteFailure(message)
             Behaviors.same
 
-          case RemovePollVote(pollId, restaurantId, username, replyTo) =>
+          case RemovePollVote(pollId, choiceId, username, replyTo) =>
             polls.get(pollId) match
               case Some(pollActor) =>
                 val responseAdapter = context.messageAdapter[PollActor.RemoveVoteResponse] { response =>
                   WrappedRemoveVoteResponse(response, replyTo)
                 }
-                pollActor ! PollActor.RemoveVote(restaurantId, username, responseAdapter)
+                pollActor ! PollActor.RemoveVote(choiceId, username, responseAdapter)
                 Behaviors.same
               case None =>
                 replyTo ! RemoveVoteFailure(s"Poll with id $pollId not found")
@@ -226,13 +226,13 @@ object PollManager:
             notifySubscribers(response)
             Behaviors.same
 
-          case EditPoll(pollId, title, restaurants, dailyReset, titleTemplate, replyTo) =>
+          case EditPoll(pollId, title, choices, dailyReset, titleTemplate, replyTo) =>
             polls.get(pollId) match
               case Some(pollActor) =>
                 val responseAdapter = context.messageAdapter[PollActor.EditPollResponse] { response =>
                   WrappedEditResponse(response, replyTo)
                 }
-                pollActor ! PollActor.EditPoll(title, restaurants, dailyReset, titleTemplate, responseAdapter)
+                pollActor ! PollActor.EditPoll(title, choices, dailyReset, titleTemplate, responseAdapter)
                 Behaviors.same
               case None =>
                 replyTo ! EditFailure(s"Poll with id $pollId not found")

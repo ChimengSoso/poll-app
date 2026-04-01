@@ -21,7 +21,7 @@ export const EditPollModal: React.FC<EditPollModalProps> = ({ poll, visible, onC
     if (poll && visible) {
       form.setFieldsValue({
         title: poll.title,
-        restaurants: poll.restaurants.map(r => ({
+        choices: poll.choices.map(r => ({
           name: r.name,
           description: r.description || '',
         })),
@@ -38,7 +38,7 @@ export const EditPollModal: React.FC<EditPollModalProps> = ({ poll, visible, onC
 
       const request: EditPollRequest = {
         title: values.title,
-        restaurants: values.restaurants || [],
+        choices: values.choices || [],
         dailyReset: values.dailyReset || false,
         titleTemplate: values.dailyReset ? (values.titleTemplate || null) : null,
       };
@@ -101,19 +101,19 @@ export const EditPollModal: React.FC<EditPollModalProps> = ({ poll, visible, onC
           </Form.Item>
         )}
 
-        <Form.List name="restaurants">
+        <Form.List name="choices">
           {(fields, { add, remove }) => (
             <>
-              <label>Restaurants:</label>
+              <label>Choices:</label>
               {fields.map(({ key, name, ...restField }) => (
                 <Space key={key} style={{ display: 'flex', marginBottom: 8, marginTop: 8 }} align="baseline">
                   <Form.Item
                     {...restField}
                     name={[name, 'name']}
-                    rules={[{ required: true, message: 'Restaurant name required' }]}
+                    rules={[{ required: true, message: 'Choice name required' }]}
                     style={{ marginBottom: 0 }}
                   >
-                    <Input placeholder="Restaurant name" style={{ width: 200 }} />
+                    <Input placeholder="Choice" style={{ width: 200 }} />
                   </Form.Item>
                   <Form.Item
                     {...restField}
@@ -129,7 +129,7 @@ export const EditPollModal: React.FC<EditPollModalProps> = ({ poll, visible, onC
               ))}
               <Form.Item style={{ marginTop: 8 }}>
                 <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                  Add Restaurant
+                  Add Choice
                 </Button>
               </Form.Item>
             </>
@@ -137,7 +137,7 @@ export const EditPollModal: React.FC<EditPollModalProps> = ({ poll, visible, onC
         </Form.List>
 
         <div style={{ color: '#888', fontSize: '12px', marginTop: 8 }}>
-          Note: Existing votes will be preserved if restaurant names match. New restaurants start with 0 votes.
+          Note: Existing votes will be preserved if choice names match. New choices start with 0 votes.
         </div>
       </Form>
     </Modal>
