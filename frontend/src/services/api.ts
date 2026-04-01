@@ -1,82 +1,59 @@
-import axios from 'axios';
 import type { Poll, CreatePollRequest, VoteRequest, PollTemplate, EditPollRequest } from '../types';
 
 const API_BASE_URL = '/api';
 
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    return undefined as T;
+  }
+  return response.json() as Promise<T>;
+}
 
 export const pollApi = {
-  // Get all polls
-  getAllPolls: async (): Promise<Poll[]> => {
-    const response = await api.get<Poll[]>('/polls');
-    return response.data;
-  },
+  getAllPolls: (): Promise<Poll[]> =>
+    request<Poll[]>('/polls'),
 
-  // Get a specific poll
-  getPoll: async (pollId: string): Promise<Poll> => {
-    const response = await api.get<Poll>(`/polls/${pollId}`);
-    return response.data;
-  },
+  getPoll: (pollId: string): Promise<Poll> =>
+    request<Poll>(`/polls/${pollId}`),
 
-  // Create a new poll
-  createPoll: async (request: CreatePollRequest): Promise<Poll> => {
-    const response = await api.post<Poll>('/polls', request);
-    return response.data;
-  },
+  createPoll: (body: CreatePollRequest): Promise<Poll> =>
+    request<Poll>('/polls', { method: 'POST', body: JSON.stringify(body) }),
 
-  // Vote for a restaurant
-  vote: async (pollId: string, restaurantId: string, username: string): Promise<Poll> => {
+  vote: (pollId: string, restaurantId: string, username: string): Promise<Poll> => {
     const voteRequest: VoteRequest = { restaurantId, username };
-    const response = await api.post<Poll>(`/polls/${pollId}/vote`, voteRequest);
-    return response.data;
+    return request<Poll>(`/polls/${pollId}/vote`, { method: 'POST', body: JSON.stringify(voteRequest) });
   },
 
-  // Reset all votes in a poll
-  resetVotes: async (pollId: string): Promise<Poll> => {
-    const response = await api.post<Poll>(`/polls/${pollId}/reset`);
-    return response.data;
-  },
+  resetVotes: (pollId: string): Promise<Poll> =>
+    request<Poll>(`/polls/${pollId}/reset`, { method: 'POST' }),
 
-  // Edit poll
-  editPoll: async (pollId: string, request: EditPollRequest): Promise<Poll> => {
-    const response = await api.put<Poll>(`/polls/${pollId}`, request);
-    return response.data;
-  },
+  editPoll: (pollId: string, body: EditPollRequest): Promise<Poll> =>
+    request<Poll>(`/polls/${pollId}`, { method: 'PUT', body: JSON.stringify(body) }),
 
-  // Get poll results
-  getResults: async (pollId: string): Promise<Poll> => {
-    const response = await api.get<Poll>(`/polls/${pollId}/results`);
-    return response.data;
-  },
+  getResults: (pollId: string): Promise<Poll> =>
+    request<Poll>(`/polls/${pollId}/results`),
 
-  // Delete a poll
-  deletePoll: async (pollId: string): Promise<void> => {
-    await api.delete(`/polls/${pollId}`);
-  },
+  deletePoll: (pollId: string): Promise<void> =>
+    request<void>(`/polls/${pollId}`, { method: 'DELETE' }),
 };
 
 export const templateApi = {
-  // Get all templates
-  getAllTemplates: async (): Promise<PollTemplate[]> => {
-    const response = await api.get<PollTemplate[]>('/templates');
-    return response.data;
-  },
+  getAllTemplates: (): Promise<PollTemplate[]> =>
+    request<PollTemplate[]>('/templates'),
 
-  // Recover poll from template
-  recoverTemplate: async (fileName: string): Promise<Poll> => {
-    const response = await api.post<Poll>(`/templates/${fileName}/recover`);
-    return response.data;
-  },
+  recoverTemplate: (fileName: string): Promise<Poll> =>
+    request<Poll>(`/templates/${fileName}/recover`, { method: 'POST' }),
 
-  // Delete template
-  deleteTemplate: async (fileName: string): Promise<void> => {
-    await api.delete(`/templates/${fileName}`);
-  },
+  deleteTemplate: (fileName: string): Promise<void> =>
+    request<void>(`/templates/${fileName}`, { method: 'DELETE' }),
 };
-
-export default api;
