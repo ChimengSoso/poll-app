@@ -26,7 +26,10 @@ case class Poll(
   voters: Set[String] = Set.empty,       // All users who have voted in this poll
   dailyReset: Boolean = false,
   titleTemplate: Option[String] = None,  // e.g. "Lunch Poll {date}"
-  lastResetDate: Option[String] = None   // ISO date of last auto-reset
+  lastResetDate: Option[String] = None,  // ISO date of last auto-reset
+  requireApproval: Boolean = false,
+  approvedVoters: Set[String] = Set.empty,
+  pendingVoters: Set[String] = Set.empty
 )
 
 case class CreatePollRequest(
@@ -35,7 +38,8 @@ case class CreatePollRequest(
   votingMode: String = "multiple",  // "single" or "multiple"
   createdBy: String,
   dailyReset: Boolean,
-  titleTemplate: Option[String]
+  titleTemplate: Option[String],
+  requireApproval: Boolean
 )
 
 case class ChoiceInput(
@@ -57,7 +61,8 @@ case class EditPollRequest(
   title: String,
   choices: List[ChoiceInput],
   dailyReset: Boolean,
-  titleTemplate: Option[String]
+  titleTemplate: Option[String],
+  requireApproval: Boolean
 )
 
 case class PollResponse(
@@ -71,7 +76,11 @@ case class PollResponse(
   voters: List[String],
   deleted: Boolean = false,
   dailyReset: Boolean = false,
-  titleTemplate: Option[String] = None
+  titleTemplate: Option[String] = None,
+  requireApproval: Boolean = false,
+  approvedVoters: List[String] = List.empty,
+  pendingVoters: List[String] = List.empty
 )
 
 case class ErrorResponse(message: String)
+case class VoterActionRequest(username: String)

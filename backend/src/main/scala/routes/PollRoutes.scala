@@ -115,6 +115,60 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command])(using system: Actor
             }
           }
         } ~
+        path(Segment / "request-vote") { pollId =>
+          post {
+            entity(as[VoterActionRequest]) { req =>
+              val response: Future[PollManager.VoterRequestPollResponse] =
+                pollManager.ask(PollManager.RequestPollVote(pollId, req.username, _))
+              onSuccess(response) {
+                case PollManager.VoterRequestSuccess(poll) =>
+                  complete(StatusCodes.OK, poll)
+                case PollManager.VoterRequestFailure(message) =>
+                  complete(StatusCodes.BadRequest, ErrorResponse(message))
+              }
+            }
+          }
+        } ~
+        path(Segment / "approve-voter") { pollId =>
+          post {
+            entity(as[VoterActionRequest]) { req =>
+              val response: Future[PollManager.VoterActionPollResponse] =
+                pollManager.ask(PollManager.ApprovePollVoter(pollId, req.username, _))
+              onSuccess(response) {
+                case PollManager.VoterActionSuccess(poll) =>
+                  complete(StatusCodes.OK, poll)
+                case PollManager.VoterActionFailure(message) =>
+                  complete(StatusCodes.BadRequest, ErrorResponse(message))
+              }
+            }
+          }
+        } ~
+        path(Segment / "reject-voter") { pollId =>
+          post {
+            entity(as[VoterActionRequest]) { req =>
+              val response: Future[PollManager.VoterActionPollResponse] =
+                pollManager.ask(PollManager.RejectPollVoter(pollId, req.username, _))
+              onSuccess(response) {
+                case PollManager.VoterActionSuccess(poll) =>
+                  complete(StatusCodes.OK, poll)
+                case PollManager.VoterActionFailure(message) =>
+                  complete(StatusCodes.BadRequest, ErrorResponse(message))
+              }
+            }
+          }
+        } ~
+        path(Segment / "voters" / Segment) { (pollId, voterUsername) =>
+          delete {
+            val response: Future[PollManager.VoterActionPollResponse] =
+              pollManager.ask(PollManager.RevokePollVoter(pollId, voterUsername, _))
+            onSuccess(response) {
+              case PollManager.VoterActionSuccess(poll) =>
+                complete(StatusCodes.OK, poll)
+              case PollManager.VoterActionFailure(message) =>
+                complete(StatusCodes.BadRequest, ErrorResponse(message))
+            }
+          }
+        } ~
         path(Segment / "reset") { pollId =>
           post {
             val response: Future[PollManager.ResetPollResponse] =
@@ -154,7 +208,7 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command])(using system: Actor
             entity(as[EditPollRequest]) { editRequest =>
               val choices = editRequest.choices.map(r => Choice(name = r.name, description = r.description))
               val response: Future[PollManager.EditPollResponse] =
-                pollManager.ask(PollManager.EditPoll(pollId, editRequest.title, choices, editRequest.dailyReset, editRequest.titleTemplate, _))
+                pollManager.ask(PollManager.EditPoll(pollId, editRequest.title, choices, editRequest.dailyReset, editRequest.titleTemplate, editRequest.requireApproval, _))
               onSuccess(response) {
                 case PollManager.EditSuccess(poll) =>
                   complete(StatusCodes.OK, poll)
@@ -197,7 +251,8 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command])(using system: Actor
                   votingMode = template.votingMode,
                   createdBy = template.createdBy,
                   dailyReset = false,
-                  titleTemplate = None
+                  titleTemplate = None,
+                  requireApproval = false
                 )
                 val response: Future[PollManager.CreatePollResponse] =
                   pollManager.ask(PollManager.CreatePoll(request, _))

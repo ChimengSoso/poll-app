@@ -13,11 +13,15 @@ object PollManager:
   case class GetAllPolls(replyTo: ActorRef[GetAllPollsResponse]) extends Command
   case class VotePoll(pollId: String, choiceId: String, username: String, replyTo: ActorRef[VotePollResponse]) extends Command
   case class RemovePollVote(pollId: String, choiceId: String, username: String, replyTo: ActorRef[RemovePollVoteResponse]) extends Command
-  case class EditPoll(pollId: String, title: String, choices: List[Choice], dailyReset: Boolean, titleTemplate: Option[String], replyTo: ActorRef[EditPollResponse]) extends Command
+  case class EditPoll(pollId: String, title: String, choices: List[Choice], dailyReset: Boolean, titleTemplate: Option[String], requireApproval: Boolean, replyTo: ActorRef[EditPollResponse]) extends Command
   case class ResetPollVotes(pollId: String, replyTo: ActorRef[ResetPollResponse]) extends Command
   case class DeletePoll(pollId: String, replyTo: ActorRef[DeletePollResponse]) extends Command
   case class Subscribe(subscriber: ActorRef[PollUpdate]) extends Command
   case class Unsubscribe(subscriber: ActorRef[PollUpdate]) extends Command
+  case class RequestPollVote(pollId: String, username: String, replyTo: ActorRef[VoterRequestPollResponse]) extends Command
+  case class ApprovePollVoter(pollId: String, username: String, replyTo: ActorRef[VoterActionPollResponse]) extends Command
+  case class RejectPollVoter(pollId: String, username: String, replyTo: ActorRef[VoterActionPollResponse]) extends Command
+  case class RevokePollVoter(pollId: String, username: String, replyTo: ActorRef[VoterActionPollResponse]) extends Command
 
   case class PollUpdate(poll: PollResponse)
 
@@ -45,6 +49,16 @@ object PollManager:
   private case class WrappedEditResponse(
     response: PollActor.EditPollResponse,
     originalReplyTo: ActorRef[EditPollResponse]
+  ) extends Command
+
+  private case class WrappedVoterRequestResponse(
+    response: PollActor.VoterRequestResponse,
+    originalReplyTo: ActorRef[VoterRequestPollResponse]
+  ) extends Command
+
+  private case class WrappedVoterActionResponse(
+    response: PollActor.VoterActionResponse,
+    originalReplyTo: ActorRef[VoterActionPollResponse]
   ) extends Command
 
   sealed trait CreatePollResponse
@@ -77,6 +91,14 @@ object PollManager:
   case class DeleteSuccess(message: String) extends DeletePollResponse
   case class DeleteFailure(message: String) extends DeletePollResponse
 
+  sealed trait VoterRequestPollResponse
+  case class VoterRequestSuccess(poll: PollResponse) extends VoterRequestPollResponse
+  case class VoterRequestFailure(message: String) extends VoterRequestPollResponse
+
+  sealed trait VoterActionPollResponse
+  case class VoterActionSuccess(poll: PollResponse) extends VoterActionPollResponse
+  case class VoterActionFailure(message: String) extends VoterActionPollResponse
+
   def apply(): Behavior[Command] =
     Behaviors.setup { context =>
       val polls = mutable.Map[String, ActorRef[PollActor.Command]]()
@@ -106,7 +128,8 @@ object PollManager:
               votingMode = votingMode,
               createdBy = request.createdBy,
               dailyReset = request.dailyReset,
-              titleTemplate = request.titleTemplate
+              titleTemplate = request.titleTemplate,
+              requireApproval = request.requireApproval
             )
             val pollActor = context.spawn(PollActor(poll), s"poll-${poll.id}")
             polls += (poll.id -> pollActor)
@@ -126,7 +149,10 @@ object PollManager:
               List.empty,
               false,
               poll.dailyReset,
-              poll.titleTemplate
+              poll.titleTemplate,
+              poll.requireApproval,
+              List.empty,
+              List.empty
             )
             replyTo ! PollCreated(pollResponse)
             notifySubscribers(pollResponse)
@@ -226,13 +252,13 @@ object PollManager:
             notifySubscribers(response)
             Behaviors.same
 
-          case EditPoll(pollId, title, choices, dailyReset, titleTemplate, replyTo) =>
+          case EditPoll(pollId, title, choices, dailyReset, titleTemplate, requireApproval, replyTo) =>
             polls.get(pollId) match
               case Some(pollActor) =>
                 val responseAdapter = context.messageAdapter[PollActor.EditPollResponse] { response =>
                   WrappedEditResponse(response, replyTo)
                 }
-                pollActor ! PollActor.EditPoll(title, choices, dailyReset, titleTemplate, responseAdapter)
+                pollActor ! PollActor.EditPoll(title, choices, dailyReset, titleTemplate, requireApproval, responseAdapter)
                 Behaviors.same
               case None =>
                 replyTo ! EditFailure(s"Poll with id $pollId not found")
@@ -270,6 +296,72 @@ object PollManager:
               case None =>
                 replyTo ! DeleteFailure(s"Poll with id $pollId not found")
                 Behaviors.same
+
+          case RequestPollVote(pollId, username, replyTo) =>
+            polls.get(pollId) match
+              case Some(pollActor) =>
+                val responseAdapter = context.messageAdapter[PollActor.VoterRequestResponse] { response =>
+                  WrappedVoterRequestResponse(response, replyTo)
+                }
+                pollActor ! PollActor.RequestToVote(username, responseAdapter)
+                Behaviors.same
+              case None =>
+                replyTo ! VoterRequestFailure(s"Poll with id $pollId not found")
+                Behaviors.same
+
+          case WrappedVoterRequestResponse(response, originalReplyTo) =>
+            response match
+              case PollActor.VoterRequestSuccess(poll) =>
+                originalReplyTo ! VoterRequestSuccess(poll)
+                notifySubscribers(poll)
+              case PollActor.VoterRequestFailure(message) =>
+                originalReplyTo ! VoterRequestFailure(message)
+            Behaviors.same
+
+          case ApprovePollVoter(pollId, username, replyTo) =>
+            polls.get(pollId) match
+              case Some(pollActor) =>
+                val responseAdapter = context.messageAdapter[PollActor.VoterActionResponse] { response =>
+                  WrappedVoterActionResponse(response, replyTo)
+                }
+                pollActor ! PollActor.ApproveVoter(username, responseAdapter)
+                Behaviors.same
+              case None =>
+                replyTo ! VoterActionFailure(s"Poll with id $pollId not found")
+                Behaviors.same
+
+          case RejectPollVoter(pollId, username, replyTo) =>
+            polls.get(pollId) match
+              case Some(pollActor) =>
+                val responseAdapter = context.messageAdapter[PollActor.VoterActionResponse] { response =>
+                  WrappedVoterActionResponse(response, replyTo)
+                }
+                pollActor ! PollActor.RejectVoter(username, responseAdapter)
+                Behaviors.same
+              case None =>
+                replyTo ! VoterActionFailure(s"Poll with id $pollId not found")
+                Behaviors.same
+
+          case RevokePollVoter(pollId, username, replyTo) =>
+            polls.get(pollId) match
+              case Some(pollActor) =>
+                val responseAdapter = context.messageAdapter[PollActor.VoterActionResponse] { response =>
+                  WrappedVoterActionResponse(response, replyTo)
+                }
+                pollActor ! PollActor.RevokeVoter(username, responseAdapter)
+                Behaviors.same
+              case None =>
+                replyTo ! VoterActionFailure(s"Poll with id $pollId not found")
+                Behaviors.same
+
+          case WrappedVoterActionResponse(response, originalReplyTo) =>
+            response match
+              case PollActor.VoterActionSuccess(poll) =>
+                originalReplyTo ! VoterActionSuccess(poll)
+                notifySubscribers(poll)
+              case PollActor.VoterActionFailure(message) =>
+                originalReplyTo ! VoterActionFailure(message)
+            Behaviors.same
         }
 
       behavior()
