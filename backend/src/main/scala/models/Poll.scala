@@ -12,7 +12,7 @@ case class Choice(
   name: String,
   description: Option[String] = None,
   votes: Int = 0,
-  voters: List[String] = List.empty  // List of usernames who voted for this
+  voters: List[String] = List.empty
 )
 
 case class Poll(
@@ -23,10 +23,10 @@ case class Poll(
   active: Boolean = true,
   votingMode: VotingMode = VotingMode.Multiple,
   createdBy: String = "anonymous",
-  voters: Set[String] = Set.empty,       // All users who have voted in this poll
+  voters: Set[String] = Set.empty,
   dailyReset: Boolean = false,
-  titleTemplate: Option[String] = None,  // e.g. "Lunch Poll {date}"
-  lastResetDate: Option[String] = None,  // ISO date of last auto-reset
+  titleTemplate: Option[String] = None,
+  lastResetDate: Option[String] = None,
   requireApproval: Boolean = false,
   approvedVoters: Set[String] = Set.empty,
   pendingVoters: Set[String] = Set.empty
@@ -35,8 +35,7 @@ case class Poll(
 case class CreatePollRequest(
   title: String,
   choices: List[ChoiceInput],
-  votingMode: String = "multiple",  // "single" or "multiple"
-  createdBy: String,
+  votingMode: String = "multiple",
   dailyReset: Boolean,
   titleTemplate: Option[String],
   requireApproval: Boolean
@@ -47,15 +46,9 @@ case class ChoiceInput(
   description: Option[String]
 )
 
-case class VoteRequest(
-  choiceId: String,
-  username: String
-)
-
-case class RemoveVoteRequest(
-  choiceId: String,
-  username: String
-)
+// username comes from JWT — body only carries choiceId
+case class VoteRequest(choiceId: String)
+case class RemoveVoteRequest(choiceId: String)
 
 case class EditPollRequest(
   title: String,

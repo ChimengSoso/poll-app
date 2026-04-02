@@ -4,7 +4,7 @@ import org.apache.pekko.actor.typed.{ActorRef, ActorSystem, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.{AskPattern, Behaviors}
 import org.apache.pekko.actor.typed.scaladsl.AskPattern._
 import org.apache.pekko.http.scaladsl.server.Directives._
-import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.server.{Route, Directive1}
 import org.apache.pekko.http.scaladsl.model.{StatusCodes, HttpEntity, ContentTypes}
 import org.apache.pekko.http.scaladsl.model.headers._
 import org.apache.pekko.http.scaladsl.model.sse.ServerSentEvent
@@ -23,11 +23,10 @@ import org.apache.pekko.http.scaladsl.marshalling.sse.EventStreamMarshalling._
 import spray.json._
 import scala.util.{Success, Failure}
 
-class PollRoutes(pollManager: ActorRef[PollManager.Command])(using system: ActorSystem[_]):
+class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Directive1[String])(using system: ActorSystem[_]):
   given timeout: Timeout = 5.seconds
   import system.executionContext
 
-  // CORS headers
   private val corsHeaders = List(
     `Access-Control-Allow-Origin`.*,
     `Access-Control-Allow-Methods`(
@@ -55,14 +54,16 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command])(using system: Actor
             }
           } ~
           post {
-            entity(as[CreatePollRequest]) { request =>
-              val response: Future[PollManager.CreatePollResponse] =
-                pollManager.ask(PollManager.CreatePoll(request, _))
-              onSuccess(response) {
-                case PollManager.PollCreated(poll) =>
-                  complete(StatusCodes.Created, poll)
-                case PollManager.PollCreationFailed(message) =>
-                  complete(StatusCodes.BadRequest, ErrorResponse(message))
+            authenticated { username =>
+              entity(as[CreatePollRequest]) { request =>
+                val response: Future[PollManager.CreatePollResponse] =
+                  pollManager.ask(PollManager.CreatePoll(request, username, _))
+                onSuccess(response) {
+                  case PollManager.PollCreated(poll) =>
+                    complete(StatusCodes.Created, poll)
+                  case PollManager.PollCreationFailed(message) =>
+                    complete(StatusCodes.BadRequest, ErrorResponse(message))
+                }
               }
             }
           }
@@ -81,45 +82,48 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command])(using system: Actor
                 queue.offer(update)
                 Behaviors.same
               },
-              s"sse-subscriber-${System.currentTimeMillis()}"
+              s"sse-subscriber-${System.nanoTime()}"
             )
 
             pollManager ! PollManager.Subscribe(subscriberActor)
-
             complete(source)
           }
         } ~
         path(Segment / "vote") { pollId =>
           post {
-            entity(as[VoteRequest]) { voteRequest =>
-              val response: Future[PollManager.VotePollResponse] =
-                pollManager.ask(PollManager.VotePoll(pollId, voteRequest.choiceId, voteRequest.username, _))
-              onSuccess(response) {
-                case PollManager.VoteSuccess(poll) =>
-                  complete(StatusCodes.OK, poll)
-                case PollManager.VoteFailure(message) =>
-                  complete(StatusCodes.BadRequest, ErrorResponse(message))
+            authenticated { username =>
+              entity(as[VoteRequest]) { voteRequest =>
+                val response: Future[PollManager.VotePollResponse] =
+                  pollManager.ask(PollManager.VotePoll(pollId, voteRequest.choiceId, username, _))
+                onSuccess(response) {
+                  case PollManager.VoteSuccess(poll) =>
+                    complete(StatusCodes.OK, poll)
+                  case PollManager.VoteFailure(message) =>
+                    complete(StatusCodes.BadRequest, ErrorResponse(message))
+                }
               }
             }
           } ~
           delete {
-            entity(as[RemoveVoteRequest]) { removeRequest =>
-              val response: Future[PollManager.RemovePollVoteResponse] =
-                pollManager.ask(PollManager.RemovePollVote(pollId, removeRequest.choiceId, removeRequest.username, _))
-              onSuccess(response) {
-                case PollManager.RemoveVoteSuccess(poll) =>
-                  complete(StatusCodes.OK, poll)
-                case PollManager.RemoveVoteFailure(message) =>
-                  complete(StatusCodes.BadRequest, ErrorResponse(message))
+            authenticated { username =>
+              entity(as[RemoveVoteRequest]) { removeRequest =>
+                val response: Future[PollManager.RemovePollVoteResponse] =
+                  pollManager.ask(PollManager.RemovePollVote(pollId, removeRequest.choiceId, username, _))
+                onSuccess(response) {
+                  case PollManager.RemoveVoteSuccess(poll) =>
+                    complete(StatusCodes.OK, poll)
+                  case PollManager.RemoveVoteFailure(message) =>
+                    complete(StatusCodes.BadRequest, ErrorResponse(message))
+                }
               }
             }
           }
         } ~
         path(Segment / "request-vote") { pollId =>
           post {
-            entity(as[VoterActionRequest]) { req =>
+            authenticated { username =>
               val response: Future[PollManager.VoterRequestPollResponse] =
-                pollManager.ask(PollManager.RequestPollVote(pollId, req.username, _))
+                pollManager.ask(PollManager.RequestPollVote(pollId, username, _))
               onSuccess(response) {
                 case PollManager.VoterRequestSuccess(poll) =>
                   complete(StatusCodes.OK, poll)
@@ -131,23 +135,41 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command])(using system: Actor
         } ~
         path(Segment / "approve-voter") { pollId =>
           post {
-            entity(as[VoterActionRequest]) { req =>
-              val response: Future[PollManager.VoterActionPollResponse] =
-                pollManager.ask(PollManager.ApprovePollVoter(pollId, req.username, _))
-              onSuccess(response) {
-                case PollManager.VoterActionSuccess(poll) =>
-                  complete(StatusCodes.OK, poll)
-                case PollManager.VoterActionFailure(message) =>
-                  complete(StatusCodes.BadRequest, ErrorResponse(message))
+            authenticated { _ =>
+              entity(as[VoterActionRequest]) { req =>
+                val response: Future[PollManager.VoterActionPollResponse] =
+                  pollManager.ask(PollManager.ApprovePollVoter(pollId, req.username, _))
+                onSuccess(response) {
+                  case PollManager.VoterActionSuccess(poll) =>
+                    complete(StatusCodes.OK, poll)
+                  case PollManager.VoterActionFailure(message) =>
+                    complete(StatusCodes.BadRequest, ErrorResponse(message))
+                }
               }
             }
           }
         } ~
         path(Segment / "reject-voter") { pollId =>
           post {
-            entity(as[VoterActionRequest]) { req =>
+            authenticated { _ =>
+              entity(as[VoterActionRequest]) { req =>
+                val response: Future[PollManager.VoterActionPollResponse] =
+                  pollManager.ask(PollManager.RejectPollVoter(pollId, req.username, _))
+                onSuccess(response) {
+                  case PollManager.VoterActionSuccess(poll) =>
+                    complete(StatusCodes.OK, poll)
+                  case PollManager.VoterActionFailure(message) =>
+                    complete(StatusCodes.BadRequest, ErrorResponse(message))
+                }
+              }
+            }
+          }
+        } ~
+        path(Segment / "voters" / Segment) { (pollId, voterUsername) =>
+          delete {
+            authenticated { _ =>
               val response: Future[PollManager.VoterActionPollResponse] =
-                pollManager.ask(PollManager.RejectPollVoter(pollId, req.username, _))
+                pollManager.ask(PollManager.RevokePollVoter(pollId, voterUsername, _))
               onSuccess(response) {
                 case PollManager.VoterActionSuccess(poll) =>
                   complete(StatusCodes.OK, poll)
@@ -157,27 +179,17 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command])(using system: Actor
             }
           }
         } ~
-        path(Segment / "voters" / Segment) { (pollId, voterUsername) =>
-          delete {
-            val response: Future[PollManager.VoterActionPollResponse] =
-              pollManager.ask(PollManager.RevokePollVoter(pollId, voterUsername, _))
-            onSuccess(response) {
-              case PollManager.VoterActionSuccess(poll) =>
-                complete(StatusCodes.OK, poll)
-              case PollManager.VoterActionFailure(message) =>
-                complete(StatusCodes.BadRequest, ErrorResponse(message))
-            }
-          }
-        } ~
         path(Segment / "reset") { pollId =>
           post {
-            val response: Future[PollManager.ResetPollResponse] =
-              pollManager.ask(PollManager.ResetPollVotes(pollId, _))
-            onSuccess(response) {
-              case PollManager.ResetSuccess(poll) =>
-                complete(StatusCodes.OK, poll)
-              case PollManager.ResetFailure(message) =>
-                complete(StatusCodes.NotFound, ErrorResponse(message))
+            authenticated { _ =>
+              val response: Future[PollManager.ResetPollResponse] =
+                pollManager.ask(PollManager.ResetPollVotes(pollId, _))
+              onSuccess(response) {
+                case PollManager.ResetSuccess(poll) =>
+                  complete(StatusCodes.OK, poll)
+                case PollManager.ResetFailure(message) =>
+                  complete(StatusCodes.NotFound, ErrorResponse(message))
+              }
             }
           }
         } ~
@@ -205,26 +217,30 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command])(using system: Actor
             }
           } ~
           put {
-            entity(as[EditPollRequest]) { editRequest =>
-              val choices = editRequest.choices.map(r => Choice(name = r.name, description = r.description))
-              val response: Future[PollManager.EditPollResponse] =
-                pollManager.ask(PollManager.EditPoll(pollId, editRequest.title, choices, editRequest.dailyReset, editRequest.titleTemplate, editRequest.requireApproval, _))
-              onSuccess(response) {
-                case PollManager.EditSuccess(poll) =>
-                  complete(StatusCodes.OK, poll)
-                case PollManager.EditFailure(message) =>
-                  complete(StatusCodes.BadRequest, ErrorResponse(message))
+            authenticated { _ =>
+              entity(as[EditPollRequest]) { editRequest =>
+                val choices = editRequest.choices.map(r => Choice(name = r.name, description = r.description))
+                val response: Future[PollManager.EditPollResponse] =
+                  pollManager.ask(PollManager.EditPoll(pollId, editRequest.title, choices, editRequest.dailyReset, editRequest.titleTemplate, editRequest.requireApproval, _))
+                onSuccess(response) {
+                  case PollManager.EditSuccess(poll) =>
+                    complete(StatusCodes.OK, poll)
+                  case PollManager.EditFailure(message) =>
+                    complete(StatusCodes.BadRequest, ErrorResponse(message))
+                }
               }
             }
           } ~
           delete {
-            val response: Future[PollManager.DeletePollResponse] =
-              pollManager.ask(PollManager.DeletePoll(pollId, _))
-            onSuccess(response) {
-              case PollManager.DeleteSuccess(message) =>
-                complete(StatusCodes.OK, DeleteSuccessResponse(message))
-              case PollManager.DeleteFailure(message) =>
-                complete(StatusCodes.NotFound, ErrorResponse(message))
+            authenticated { _ =>
+              val response: Future[PollManager.DeletePollResponse] =
+                pollManager.ask(PollManager.DeletePoll(pollId, _))
+              onSuccess(response) {
+                case PollManager.DeleteSuccess(message) =>
+                  complete(StatusCodes.OK, DeleteSuccessResponse(message))
+                case PollManager.DeleteFailure(message) =>
+                  complete(StatusCodes.NotFound, ErrorResponse(message))
+              }
             }
           }
         }
@@ -242,39 +258,42 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command])(using system: Actor
         } ~
         path(Segment / "recover") { fileName =>
           post {
-            TemplateService.loadTemplate(fileName) match
-              case Success(template) =>
-                val choices = template.choices.map(r => ChoiceInput(r.name, r.description))
-                val request = CreatePollRequest(
-                  title = s"${template.title} (Recovered)",
-                  choices = choices,
-                  votingMode = template.votingMode,
-                  createdBy = template.createdBy,
-                  dailyReset = false,
-                  titleTemplate = None,
-                  requireApproval = false
-                )
-                val response: Future[PollManager.CreatePollResponse] =
-                  pollManager.ask(PollManager.CreatePoll(request, _))
-                onSuccess(response) {
-                  case PollManager.PollCreated(poll) =>
-                    complete(StatusCodes.Created, poll)
-                  case PollManager.PollCreationFailed(message) =>
-                    complete(StatusCodes.BadRequest, ErrorResponse(message))
-                }
-              case Failure(ex) =>
-                complete(StatusCodes.NotFound, ErrorResponse(s"Template not found: ${ex.getMessage}"))
+            authenticated { _ =>
+              TemplateService.loadTemplate(fileName) match
+                case Success(template) =>
+                  val choices = template.choices.map(r => ChoiceInput(r.name, r.description))
+                  val request = CreatePollRequest(
+                    title = s"${template.title} (Recovered)",
+                    choices = choices,
+                    votingMode = template.votingMode,
+                    dailyReset = false,
+                    titleTemplate = None,
+                    requireApproval = false
+                  )
+                  val response: Future[PollManager.CreatePollResponse] =
+                    pollManager.ask(PollManager.CreatePoll(request, template.createdBy, _))
+                  onSuccess(response) {
+                    case PollManager.PollCreated(poll) =>
+                      complete(StatusCodes.Created, poll)
+                    case PollManager.PollCreationFailed(message) =>
+                      complete(StatusCodes.BadRequest, ErrorResponse(message))
+                  }
+                case Failure(ex) =>
+                  complete(StatusCodes.NotFound, ErrorResponse(s"Template not found: ${ex.getMessage}"))
+            }
           }
         } ~
         path(Segment) { fileName =>
           delete {
-            TemplateService.deleteTemplate(fileName) match
-              case Success(true) =>
-                complete(StatusCodes.OK, DeleteSuccessResponse(s"Template $fileName deleted"))
-              case Success(false) =>
-                complete(StatusCodes.NotFound, ErrorResponse("Template not found"))
-              case Failure(ex) =>
-                complete(StatusCodes.InternalServerError, ErrorResponse(s"Failed to delete: ${ex.getMessage}"))
+            authenticated { _ =>
+              TemplateService.deleteTemplate(fileName) match
+                case Success(true) =>
+                  complete(StatusCodes.OK, DeleteSuccessResponse(s"Template $fileName deleted"))
+                case Success(false) =>
+                  complete(StatusCodes.NotFound, ErrorResponse("Template not found"))
+                case Failure(ex) =>
+                  complete(StatusCodes.InternalServerError, ErrorResponse(s"Failed to delete: ${ex.getMessage}"))
+            }
           }
         }
       }

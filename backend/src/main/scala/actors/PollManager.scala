@@ -8,7 +8,7 @@ import scala.collection.mutable
 
 object PollManager:
   sealed trait Command
-  case class CreatePoll(request: CreatePollRequest, replyTo: ActorRef[CreatePollResponse]) extends Command
+  case class CreatePoll(request: CreatePollRequest, createdBy: String, replyTo: ActorRef[CreatePollResponse]) extends Command
   case class GetPoll(pollId: String, replyTo: ActorRef[GetPollResponse]) extends Command
   case class GetAllPolls(replyTo: ActorRef[GetAllPollsResponse]) extends Command
   case class VotePoll(pollId: String, choiceId: String, username: String, replyTo: ActorRef[VotePollResponse]) extends Command
@@ -117,7 +117,7 @@ object PollManager:
             subscribers -= subscriber
             Behaviors.same
 
-          case CreatePoll(request, replyTo) =>
+          case CreatePoll(request, createdBy, replyTo) =>
             val votingMode = request.votingMode.toLowerCase match
               case "single" => VotingMode.Single
               case _ => VotingMode.Multiple
@@ -126,7 +126,7 @@ object PollManager:
               title = request.title,
               choices = request.choices.map(r => Choice(name = r.name, description = r.description)),
               votingMode = votingMode,
-              createdBy = request.createdBy,
+              createdBy = createdBy,
               dailyReset = request.dailyReset,
               titleTemplate = request.titleTemplate,
               requireApproval = request.requireApproval
