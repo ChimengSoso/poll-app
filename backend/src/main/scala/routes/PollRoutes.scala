@@ -15,13 +15,15 @@ import scala.concurrent.duration._
 import scala.concurrent.Future
 import actors.PollManager
 import models._
-import services.TemplateService
+import services.{TemplateService, HistoryService}
+import json.HistoryJsonFormats.{_, given}
 import json.JsonFormats.{_, given}
 import json.{DeleteSuccessResponse, PollTemplateListItem}
 import org.apache.pekko.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import org.apache.pekko.http.scaladsl.marshalling.sse.EventStreamMarshalling._
 import spray.json._
 import scala.util.{Success, Failure}
+import java.util.UUID
 
 class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Directive1[String])(using system: ActorSystem[_]):
   given timeout: Timeout = 5.seconds
@@ -193,6 +195,30 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
             }
           }
         } ~
+        path(Segment / "force-reset") { pollId =>
+          post {
+            authenticated { username =>
+              val getResponse: Future[PollManager.GetPollResponse] =
+                pollManager.ask(PollManager.GetPoll(pollId, _))
+              onSuccess(getResponse) {
+                case PollManager.PollFound(poll) =>
+                  if poll.createdBy != username then
+                    complete(StatusCodes.Forbidden, ErrorResponse("Only the poll owner can force reset this poll"))
+                  else if !poll.dailyReset then
+                    complete(StatusCodes.BadRequest, ErrorResponse("This poll does not have daily reset enabled"))
+                  else
+                    val response: Future[PollManager.EditPollResponse] =
+                      pollManager.ask(PollManager.ForceResetPollCmd(pollId, _))
+                    onSuccess(response) {
+                      case PollManager.EditSuccess(updated) => complete(StatusCodes.OK, updated)
+                      case PollManager.EditFailure(message) => complete(StatusCodes.BadRequest, ErrorResponse(message))
+                    }
+                case PollManager.PollNotFound(message) =>
+                  complete(StatusCodes.NotFound, ErrorResponse(message))
+              }
+            }
+          }
+        } ~
         path(Segment / "close") { pollId =>
           post {
             authenticated { username =>
@@ -206,7 +232,25 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
                     val response: Future[PollManager.EditPollResponse] =
                       pollManager.ask(PollManager.ClosePollCmd(pollId, _))
                     onSuccess(response) {
-                      case PollManager.EditSuccess(updated) => complete(StatusCodes.OK, updated)
+                      case PollManager.EditSuccess(updated) =>
+                        val maxVotes = updated.choices.map(_.votes).maxOption.getOrElse(0)
+                        val winners = if maxVotes == 0 then List.empty else updated.choices.filter(_.votes == maxVotes)
+                        val snapshot = PollSnapshot(
+                          snapshotId = UUID.randomUUID().toString,
+                          timestamp  = System.currentTimeMillis(),
+                          event      = "closed",
+                          closedBy   = username,
+                          summary    = SnapshotSummary(
+                            title           = updated.title,
+                            totalVotes      = updated.totalVotes,
+                            votingMode      = updated.votingMode,
+                            anonymousVoting = updated.anonymousVoting,
+                            choices         = updated.choices.map(c => ChoiceSummary(c.name, c.votes, c.voters)),
+                            winner          = if winners.size == 1 then Some(winners.head.name) else None
+                          )
+                        )
+                        HistoryService.appendSnapshot(pollId, updated.title, snapshot)
+                        complete(StatusCodes.OK, updated)
                       case PollManager.EditFailure(message) => complete(StatusCodes.BadRequest, ErrorResponse(message))
                     }
                 case PollManager.PollNotFound(message) =>
@@ -292,6 +336,36 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
                   complete(StatusCodes.NotFound, ErrorResponse(message))
               }
             }
+          }
+        }
+      } ~
+      pathPrefix("api" / "polls") {
+        path(Segment / "history" / "import") { pollId =>
+          post {
+            authenticated { _ =>
+              entity(as[PollHistory]) { incoming =>
+                val titleFuture: Future[PollManager.GetPollResponse] =
+                  pollManager.ask(PollManager.GetPoll(pollId, _))
+                onSuccess(titleFuture) {
+                  case PollManager.PollFound(poll) =>
+                    HistoryService.mergeAndSave(pollId, poll.title, incoming) match
+                      case Success(merged) => complete(StatusCodes.OK, merged)
+                      case Failure(ex)     => complete(StatusCodes.BadRequest, ErrorResponse(ex.getMessage))
+                  case PollManager.PollNotFound(_) =>
+                    // Poll may not exist in memory (e.g. after restart) — use title from incoming or empty
+                    HistoryService.mergeAndSave(pollId, incoming.pollTitle, incoming) match
+                      case Success(merged) => complete(StatusCodes.OK, merged)
+                      case Failure(ex)     => complete(StatusCodes.BadRequest, ErrorResponse(ex.getMessage))
+                }
+              }
+            }
+          }
+        } ~
+        path(Segment / "history") { pollId =>
+          get {
+            HistoryService.getHistory(pollId) match
+              case Success(history) => complete(StatusCodes.OK, history)
+              case Failure(ex)      => complete(StatusCodes.InternalServerError, ErrorResponse(ex.getMessage))
           }
         }
       } ~

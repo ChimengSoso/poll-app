@@ -1,9 +1,13 @@
 import type { Poll, CreatePollRequest, VoteRequest, RemoveVoteRequest, PollTemplate, EditPollRequest, VoterActionRequest } from '../types';
+import { setHistoryAuthToken } from './historyApi';
 
 const API_BASE_URL = '/api';
 
 let authToken: string | null = null;
-export const setAuthToken = (token: string | null) => { authToken = token; };
+export const setAuthToken = (token: string | null) => {
+  authToken = token;
+  setHistoryAuthToken(token);
+};
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -81,6 +85,9 @@ export const pollApi = {
 
   reopenPoll: (pollId: string, password: string): Promise<Poll> =>
     request<Poll>(`/polls/${pollId}/reopen`, { method: 'POST', body: JSON.stringify({ password }) }),
+
+  forceReset: (pollId: string): Promise<Poll> =>
+    request<Poll>(`/polls/${pollId}/force-reset`, { method: 'POST' }),
 };
 
 export const templateApi = {

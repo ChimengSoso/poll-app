@@ -9,6 +9,7 @@ import { VotePanel } from './components/VotePanel';
 import { Results } from './components/Results';
 import { TemplateList } from './components/TemplateList';
 import { PendingResets } from './components/PendingResets';
+import { PollHistory } from './components/PollHistory';
 import { pollUpdateService } from './services/pollUpdateService';
 import { authUpdateService } from './services/authUpdateService';
 import type { Poll } from './types';
@@ -23,6 +24,7 @@ function MainApp() {
   const [selectedPoll, setSelectedPoll] = useState<Poll | null>(null);
   const [activeTab, setActiveTab] = useState('1');
   const [pendingResetsCount, setPendingResetsCount] = useState(0);
+  const [historyCount, setHistoryCount] = useState(0);
 
   useEffect(() => {
     if (!selectedPoll) return;
@@ -68,6 +70,7 @@ function MainApp() {
 
   const handlePollSelect = (poll: Poll) => {
     setSelectedPoll(poll);
+    setHistoryCount(0);
     setActiveTab('2');
   };
 
@@ -81,6 +84,7 @@ function MainApp() {
     if (activeTab === '2' && !selectedPoll) setActiveTab('1');
     if (activeTab === '3' && (!selectedPoll || selectedPoll.totalVotes === 0)) setActiveTab('1');
     if (activeTab === '5' && pendingResetsCount === 0) setActiveTab('1');
+    if (activeTab === '6' && !selectedPoll) setActiveTab('1');
   }, [selectedPoll, pendingResetsCount, activeTab]);
 
   const tabItems = [
@@ -122,6 +126,13 @@ function MainApp() {
           </Badge>
         ),
         children: <PendingResets onCountChange={setPendingResetsCount} />,
+      },
+    ] : []),
+    ...(selectedPoll ? [
+      {
+        key: '6',
+        label: 'History',
+        children: <PollHistory poll={selectedPoll} onHistoryCount={setHistoryCount} />,
       },
     ] : []),
   ];

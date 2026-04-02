@@ -19,6 +19,7 @@ object PollActor:
   case class RevokeVoter(username: String, replyTo: ActorRef[VoterActionResponse]) extends Command
   case class ClosePoll(replyTo: ActorRef[EditPollResponse]) extends Command
   case class ReopenPoll(replyTo: ActorRef[EditPollResponse]) extends Command
+  case class ForceReset(replyTo: ActorRef[EditPollResponse]) extends Command
 
   sealed trait VoteResponse
   case class VoteSuccess(poll: PollResponse) extends VoteResponse
@@ -255,4 +256,10 @@ object PollActor:
           val updated = poll.copy(active = true)
           replyTo ! EditSuccess(toPollResponse(updated))
           active(updated)
+
+        case ForceReset(replyTo) =>
+          val withClearedDate = poll.copy(lastResetDate = None)
+          val reset = applyDailyReset(withClearedDate)
+          replyTo ! EditSuccess(toPollResponse(reset))
+          active(reset)
     }

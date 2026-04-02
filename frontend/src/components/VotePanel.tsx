@@ -21,6 +21,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
   const [resetting, setResetting] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [forceResetting, setForceResetting] = useState(false);
   const [reopenModalVisible, setReopenModalVisible] = useState(false);
   const [reopenPassword, setReopenPassword] = useState('');
   const [reopenLoading, setReopenLoading] = useState(false);
@@ -88,6 +89,19 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
       message.error(error.message || 'Failed to send request');
     } finally {
       setRequesting(false);
+    }
+  };
+
+  const handleForceReset = async () => {
+    try {
+      setForceResetting(true);
+      const updatedPoll = await pollApi.forceReset(poll.id);
+      message.success('Daily reset applied!');
+      onVoteSuccess(updatedPoll);
+    } catch (error: any) {
+      message.error(error.message || 'Failed to force reset');
+    } finally {
+      setForceResetting(false);
     }
   };
 
@@ -323,6 +337,22 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
                   Reset Votes
                 </Button>
               </Popconfirm>
+              {poll.dailyReset && (
+                <Popconfirm
+                  title="Force daily reset now?"
+                  description="This will reset votes and update the title as if today is a new day."
+                  onConfirm={handleForceReset}
+                  okText="Yes, force reset"
+                  cancelText="Cancel"
+                >
+                  <Button
+                    icon={<ReloadOutlined />}
+                    loading={forceResetting}
+                  >
+                    Force Daily Reset
+                  </Button>
+                </Popconfirm>
+              )}
             </>
           )}
         </Space>

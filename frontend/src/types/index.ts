@@ -72,6 +72,36 @@ export interface PollTemplate {
   savedAt: number;
 }
 
+export interface ChoiceSummary {
+  name: string;
+  votes: number;
+  voters: string[];
+}
+
+export interface SnapshotSummary {
+  title: string;
+  totalVotes: number;
+  votingMode: string;
+  anonymousVoting: boolean;
+  choices: ChoiceSummary[];
+  winner?: string;
+}
+
+export interface PollSnapshot {
+  snapshotId: string;
+  timestamp: number;
+  event: string;
+  closedBy: string;
+  summary: SnapshotSummary;
+}
+
+export interface PollHistory {
+  version: string;
+  pollId: string;
+  pollTitle: string;
+  snapshots: PollSnapshot[];
+}
+
 export interface ResetStatusResponse {
   requestId: string;
   username: string;
