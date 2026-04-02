@@ -24,7 +24,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
   const { username } = useUser();
 
   const isApprovalRequired = poll.requireApproval;
-  const isApproved = username ? poll.approvedVoters.includes(username) : false;
+  const isApproved = username ? (poll.approvedVoters.includes(username) || username === poll.createdBy) : false;
   const isPending = username ? poll.pendingVoters.includes(username) : false;
   const isOwner = username === poll.createdBy;
 

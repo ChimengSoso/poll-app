@@ -91,7 +91,7 @@ object PollActor:
 
         case Vote(choiceId, username, replyTo) =>
           val current = applyDailyReset(poll)
-          if current.requireApproval && !current.approvedVoters.contains(username) then
+          if current.requireApproval && !current.approvedVoters.contains(username) && username != current.createdBy then
             replyTo ! VoteFailure(s"User $username is not approved to vote in this poll")
             active(current)
           else
