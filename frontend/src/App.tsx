@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Layout, Tabs, Typography, Button } from 'antd';
+import { Layout, Tabs, Typography, Button, Badge } from 'antd';
 import { LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import { UserProvider, useUser } from './contexts/UserContext';
 import { Login } from './components/Login';
@@ -8,7 +8,9 @@ import { PollList } from './components/PollList';
 import { VotePanel } from './components/VotePanel';
 import { Results } from './components/Results';
 import { TemplateList } from './components/TemplateList';
+import { PendingResets } from './components/PendingResets';
 import { pollUpdateService } from './services/pollUpdateService';
+import { authUpdateService } from './services/authUpdateService';
 import type { Poll } from './types';
 
 const { Header, Content } = Layout;
@@ -19,27 +21,34 @@ function MainApp() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedPoll, setSelectedPoll] = useState<Poll | null>(null);
   const [activeTab, setActiveTab] = useState('1');
+  const [pendingResetsCount, setPendingResetsCount] = useState(0);
 
-  // Subscribe to real-time poll updates for the selected poll
   useEffect(() => {
     if (!selectedPoll) return;
-
     const unsubscribe = pollUpdateService.subscribe((updatedPoll) => {
-      // Update the selected poll if it matches
       if (selectedPoll.id === updatedPoll.id) {
-        console.log('[App] Updating selected poll:', updatedPoll.id);
         setSelectedPoll(updatedPoll);
       }
     });
-
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [selectedPoll?.id]);
 
-  const handlePollCreated = () => {
-    setRefreshTrigger((prev) => prev + 1);
-  };
+  // Keep badge count updated via SSE
+  useEffect(() => {
+    const unsubscribe = authUpdateService.subscribe((event) => {
+      if (event.type === 'reset-update') {
+        setPendingResetsCount((prev) => {
+          // Only increment if it's a new request ID not yet counted
+          return prev; // actual count managed by PendingResets component
+        });
+      } else if (event.type === 'reset-approved') {
+        setPendingResetsCount((prev) => Math.max(0, prev - 1));
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handlePollCreated = () => setRefreshTrigger((prev) => prev + 1);
 
   const handlePollSelect = (poll: Poll) => {
     setSelectedPoll(poll);
@@ -89,6 +98,15 @@ function MainApp() {
       label: 'Templates',
       children: <TemplateList onTemplateRecover={handlePollCreated} />,
     },
+    {
+      key: '5',
+      label: (
+        <Badge count={pendingResetsCount} size="small">
+          <span style={{ paddingRight: pendingResetsCount > 0 ? 8 : 0 }}>Pending Resets</span>
+        </Badge>
+      ),
+      children: <PendingResets onCountChange={setPendingResetsCount} />,
+    },
   ];
 
   return (
@@ -98,7 +116,7 @@ function MainApp() {
         padding: '0 24px',
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
       }}>
         <Title level={2} style={{ color: 'white', margin: '16px 0' }}>
           🗳️ OpenPoll
@@ -107,11 +125,7 @@ function MainApp() {
           <span style={{ color: 'white' }}>
             <UserOutlined /> {username}
           </span>
-          <Button
-            icon={<LogoutOutlined />}
-            onClick={logout}
-            type="default"
-          >
+          <Button icon={<LogoutOutlined />} onClick={logout} type="default">
             Logout
           </Button>
         </div>

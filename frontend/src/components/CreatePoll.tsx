@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import { Form, Input, Button, Space, Card, message, Radio, Switch } from 'antd';
 import { MinusCircleOutlined, PlusOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons';
 import { pollApi } from '../services/api';
-import { useUser } from '../contexts/UserContext';
 import type { CreatePollRequest } from '../types';
 
 interface CreatePollProps {
@@ -12,7 +11,6 @@ interface CreatePollProps {
 export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const { username } = useUser();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dailyResetValue = Form.useWatch('dailyReset', form);
@@ -24,7 +22,6 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
         title: values.title,
         choices: values.choices || [],
         votingMode: values.votingMode || 'multiple',
-        createdBy: username!,
         dailyReset: values.dailyReset || false,
         titleTemplate: values.dailyReset ? (values.titleTemplate || null) : null,
         requireApproval: values.requireApproval || false,

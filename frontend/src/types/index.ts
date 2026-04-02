@@ -27,7 +27,6 @@ export interface CreatePollRequest {
   title: string;
   choices: ChoiceInput[];
   votingMode: string;
-  createdBy: string;
   dailyReset: boolean;
   titleTemplate: string | null;
   requireApproval: boolean;
@@ -38,14 +37,13 @@ export interface ChoiceInput {
   description?: string;
 }
 
+// username comes from JWT — body only carries choiceId
 export interface VoteRequest {
   choiceId: string;
-  username: string;
 }
 
 export interface RemoveVoteRequest {
   choiceId: string;
-  username: string;
 }
 
 export interface EditPollRequest {
@@ -69,4 +67,13 @@ export interface PollTemplate {
   pollId: string;
   title: string;
   savedAt: number;
+}
+
+export interface ResetStatusResponse {
+  requestId: string;
+  username: string;
+  votes: number;
+  threshold: number;
+  status: 'pending' | 'approved' | 'expired';
+  expiresAt: number;
 }

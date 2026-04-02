@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { setAuthToken } from '../services/api';
 
 interface UserContextType {
   username: string | null;
-  login: (username: string) => void;
+  token: string | null;
+  login: (username: string, token: string) => void;
   logout: () => void;
   isLoggedIn: boolean;
 }
@@ -23,30 +25,40 @@ interface UserProviderProps {
 
 export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [username, setUsername] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
 
-  // Load username from localStorage on mount
   useEffect(() => {
     const savedUsername = localStorage.getItem('openpoll-username');
-    if (savedUsername) {
+    const savedToken = localStorage.getItem('openpoll-token');
+    if (savedUsername && savedToken) {
       setUsername(savedUsername);
+      setToken(savedToken);
+      setAuthToken(savedToken);
     }
   }, []);
 
-  const login = (newUsername: string) => {
+  const login = (newUsername: string, newToken: string) => {
     setUsername(newUsername);
+    setToken(newToken);
     localStorage.setItem('openpoll-username', newUsername);
+    localStorage.setItem('openpoll-token', newToken);
+    setAuthToken(newToken);
   };
 
   const logout = () => {
     setUsername(null);
+    setToken(null);
     localStorage.removeItem('openpoll-username');
+    localStorage.removeItem('openpoll-token');
+    setAuthToken(null);
   };
 
   const value: UserContextType = {
     username,
+    token,
     login,
     logout,
-    isLoggedIn: !!username,
+    isLoggedIn: !!username && !!token,
   };
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;

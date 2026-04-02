@@ -2,11 +2,15 @@ import type { Poll, CreatePollRequest, VoteRequest, RemoveVoteRequest, PollTempl
 
 const API_BASE_URL = '/api';
 
+let authToken: string | null = null;
+export const setAuthToken = (token: string | null) => { authToken = token; };
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...options.headers,
     },
   });
@@ -34,13 +38,13 @@ export const pollApi = {
   createPoll: (body: CreatePollRequest): Promise<Poll> =>
     request<Poll>('/polls', { method: 'POST', body: JSON.stringify(body) }),
 
-  vote: (pollId: string, choiceId: string, username: string): Promise<Poll> => {
-    const voteRequest: VoteRequest = { choiceId, username };
+  vote: (pollId: string, choiceId: string): Promise<Poll> => {
+    const voteRequest: VoteRequest = { choiceId };
     return request<Poll>(`/polls/${pollId}/vote`, { method: 'POST', body: JSON.stringify(voteRequest) });
   },
 
-  removeVote: (pollId: string, choiceId: string, username: string): Promise<Poll> => {
-    const removeRequest: RemoveVoteRequest = { choiceId, username };
+  removeVote: (pollId: string, choiceId: string): Promise<Poll> => {
+    const removeRequest: RemoveVoteRequest = { choiceId };
     return request<Poll>(`/polls/${pollId}/vote`, { method: 'DELETE', body: JSON.stringify(removeRequest) });
   },
 
@@ -56,10 +60,8 @@ export const pollApi = {
   deletePoll: (pollId: string): Promise<void> =>
     request<void>(`/polls/${pollId}`, { method: 'DELETE' }),
 
-  requestToVote: (pollId: string, username: string): Promise<Poll> => {
-    const body: VoterActionRequest = { username };
-    return request<Poll>(`/polls/${pollId}/request-vote`, { method: 'POST', body: JSON.stringify(body) });
-  },
+  requestToVote: (pollId: string): Promise<Poll> =>
+    request<Poll>(`/polls/${pollId}/request-vote`, { method: 'POST' }),
 
   approveVoter: (pollId: string, username: string): Promise<Poll> => {
     const body: VoterActionRequest = { username };

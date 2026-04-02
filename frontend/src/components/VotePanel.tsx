@@ -35,7 +35,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
     }
     try {
       setVoting(true);
-      const updatedPoll = await pollApi.vote(poll.id, choiceId, username);
+      const updatedPoll = await pollApi.vote(poll.id, choiceId);
       message.success('Vote recorded!');
       onVoteSuccess(updatedPoll);
     } catch (error: any) {
@@ -49,7 +49,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
     if (!username) return;
     try {
       setRemoving(true);
-      const updatedPoll = await pollApi.removeVote(poll.id, choiceId, username);
+      const updatedPoll = await pollApi.removeVote(poll.id, choiceId);
       message.success('Vote removed');
       onVoteSuccess(updatedPoll);
     } catch (error: any) {
@@ -76,7 +76,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
     if (!username) return;
     try {
       setRequesting(true);
-      const updatedPoll = await pollApi.requestToVote(poll.id, username);
+      const updatedPoll = await pollApi.requestToVote(poll.id);
       message.success('Request sent! Waiting for owner approval.');
       onVoteSuccess(updatedPoll);
     } catch (error: any) {
