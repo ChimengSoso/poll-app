@@ -308,8 +308,9 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
                   onConfirm={handleClosePoll}
                   okText="Close Poll"
                   cancelText="Cancel"
+                  disabled={poll.totalVotes === 0}
                 >
-                  <Button icon={<LockOutlined />} loading={closing}>
+                  <Button icon={<LockOutlined />} loading={closing} disabled={poll.totalVotes === 0}>
                     Close Poll
                   </Button>
                 </Popconfirm>

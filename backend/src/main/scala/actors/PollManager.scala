@@ -152,9 +152,10 @@ object PollManager:
               case VotingMode.Single => "single"
               case VotingMode.Multiple => "multiple"
 
+            val resolvedTitle = if poll.dailyReset then PollActor.resolveTitle(poll.titleTemplate, poll.title) else poll.title
             val pollResponse = PollResponse(
               poll.id,
-              poll.title,
+              resolvedTitle,
               poll.choices,
               poll.totalVotes,
               poll.active,

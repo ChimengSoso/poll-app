@@ -11,7 +11,14 @@ object PollActor:
   case class Vote(choiceId: String, username: String, replyTo: ActorRef[VoteResponse]) extends Command
   case class RemoveVote(choiceId: String, username: String, replyTo: ActorRef[RemoveVoteResponse]) extends Command
   case class UpdatePoll(poll: Poll, replyTo: ActorRef[PollResponse]) extends Command
-  case class EditPoll(title: String, choices: List[Choice], dailyReset: Boolean, titleTemplate: Option[String], requireApproval: Boolean, anonymousVoting: Boolean, replyTo: ActorRef[EditPollResponse]) extends Command
+  case class EditPoll(title: String,
+                      choices: List[Choice],
+                      dailyReset: Boolean,
+                      titleTemplate: Option[String],
+                      requireApproval: Boolean,
+                      anonymousVoting: Boolean,
+                      replyTo: ActorRef[EditPollResponse]
+  ) extends Command
   case class ResetVotes(replyTo: ActorRef[PollResponse]) extends Command
   case class RequestToVote(username: String, replyTo: ActorRef[VoterRequestResponse]) extends Command
   case class ApproveVoter(username: String, replyTo: ActorRef[VoterActionResponse]) extends Command
@@ -46,7 +53,7 @@ object PollActor:
 
   private def toPollResponse(poll: Poll, deleted: Boolean = false): PollResponse =
     val votingModeStr = poll.votingMode match
-      case VotingMode.Single => "single"
+      case VotingMode.Single   => "single"
       case VotingMode.Multiple => "multiple"
 
     PollResponse(
@@ -67,16 +74,65 @@ object PollActor:
       poll.anonymousVoting
     )
 
+  def resolveTitle(titleTemplate: Option[String], fallback: String): String =
+    titleTemplate
+      .map { t =>
+        val date = LocalDate.now()
+        t.replace("{date_en}", formatDateEn(date))
+          .replace("{date_th}", formatDateTh(date))
+          .replace("{date}", formatDateTh(date))
+      }
+      .getOrElse(fallback)
+
+  private val thaiMonths = Array(
+    "มกราคม",
+    "กุมภาพันธ์",
+    "มีนาคม",
+    "เมษายน",
+    "พฤษภาคม",
+    "มิถุนายน",
+    "กรกฎาคม",
+    "สิงหาคม",
+    "กันยายน",
+    "ตุลาคม",
+    "พฤศจิกายน",
+    "ธันวาคม"
+  )
+  private val enMonths = Array(
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December"
+  )
+
+  private def formatDateEn(date: LocalDate): String =
+    val day = f"${date.getDayOfMonth}%02d"
+    val month = enMonths(date.getMonthValue - 1)
+    val year = date.getYear
+    s"$day $month $year"
+
+  private def formatDateTh(date: LocalDate): String =
+    val day = date.getDayOfMonth
+    val month = thaiMonths(date.getMonthValue - 1)
+    val year = date.getYear + 543
+    s"วันที่ $day $month $year"
+
   // Returns poll with votes reset and title updated if today is a new day
   private def applyDailyReset(poll: Poll): Poll =
     if !poll.dailyReset then poll
     else
-      val today = LocalDate.now().toString  // e.g. "2026-04-01"
+      val today = LocalDate.now().toString // ISO key e.g. "2026-04-02"
       if poll.lastResetDate.contains(today) then poll
       else
-        val newTitle = poll.titleTemplate
-          .map(_.replace("{date}", today))
-          .getOrElse(poll.title)
+        val newTitle = resolveTitle(poll.titleTemplate, poll.title)
         poll.copy(
           title = newTitle,
           choices = poll.choices.map(_.copy(votes = 0, voters = List.empty)),
@@ -154,8 +210,7 @@ object PollActor:
                 Behaviors.same
               else
                 val updatedChoices = poll.choices.map { r =>
-                  if r.id == choiceId then
-                    r.copy(votes = r.votes - 1, voters = r.voters.filterNot(_ == username))
+                  if r.id == choiceId then r.copy(votes = r.votes - 1, voters = r.voters.filterNot(_ == username))
                   else r
                 }
                 val stillVotingElsewhere = updatedChoices.exists(_.voters.contains(username))

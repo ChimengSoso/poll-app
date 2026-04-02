@@ -190,9 +190,9 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
           <Form.Item
             label="Title Template"
             name="titleTemplate"
-            tooltip={`Use {date} as a placeholder for today's date, e.g. "Lunch Poll {date}". Leave blank to keep the title unchanged on reset.`}
+            tooltip={`Placeholders: {date} or {date_th} → "วันที่ 2 เมษายน 2569", {date_en} → "02-April-2026". Leave blank to keep the title unchanged.`}
           >
-            <Input placeholder='e.g., Lunch Poll {date}' />
+            <Input placeholder='e.g., รายการอาหารกลางวัน {date_th}' />
           </Form.Item>
         )}
 

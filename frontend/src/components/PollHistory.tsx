@@ -102,7 +102,16 @@ export const PollHistory: React.FC<PollHistoryProps> = ({ poll, onHistoryCount }
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const formatDate = (ts: number) => new Date(ts).toLocaleString();
+  const thaiMonths = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+  const formatDate = (ts: number) => {
+    const d = new Date(ts);
+    const day = d.getDate();
+    const month = thaiMonths[d.getMonth()];
+    const year = d.getFullYear() + 543;
+    const time = d.toLocaleTimeString('th-TH');
+    return `วันที่ ${day} ${month} ${year} ${time}`;
+  };
 
   const snapshotColumns = (snapshot: PollSnapshot) => {
     const showVoters = !snapshot.summary.anonymousVoting || isOwner;
