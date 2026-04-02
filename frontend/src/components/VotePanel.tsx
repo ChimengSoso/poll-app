@@ -241,29 +241,31 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
         </Space>
       }
       extra={
-        <Space>
-          <Button
-            icon={<EditOutlined />}
-            onClick={() => setEditModalVisible(true)}
-          >
-            Edit Poll
-          </Button>
-          <Popconfirm
-            title="Reset all votes?"
-            description="This will reset all votes and everyone can vote again. Are you sure?"
-            onConfirm={handleResetVotes}
-            okText="Yes, reset"
-            cancelText="Cancel"
-          >
+        isOwner ? (
+          <Space>
             <Button
-              danger
-              icon={<ReloadOutlined />}
-              loading={resetting}
+              icon={<EditOutlined />}
+              onClick={() => setEditModalVisible(true)}
             >
-              Reset Votes
+              Edit Poll
             </Button>
-          </Popconfirm>
-        </Space>
+            <Popconfirm
+              title="Reset all votes?"
+              description="This will reset all votes and everyone can vote again. Are you sure?"
+              onConfirm={handleResetVotes}
+              okText="Yes, reset"
+              cancelText="Cancel"
+            >
+              <Button
+                danger
+                icon={<ReloadOutlined />}
+                loading={resetting}
+              >
+                Reset Votes
+              </Button>
+            </Popconfirm>
+          </Space>
+        ) : undefined
       }
     >
       {winners.length > 0 && (
