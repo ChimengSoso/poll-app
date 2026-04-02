@@ -51,6 +51,35 @@ object PollActor:
   def apply(initialPoll: Poll): Behavior[Command] =
     active(initialPoll)
 
+  // ── Pure helpers ────────────────────────────────────────────────────────────
+
+  private def castVote(poll: Poll, choiceId: String, username: String): Poll =
+    val updatedChoices = poll.choices.map { c =>
+      if c.id == choiceId then c.copy(votes = c.votes + 1, voters = username :: c.voters)
+      else c
+    }
+    poll.copy(choices = updatedChoices, totalVotes = poll.totalVotes + 1, voters = poll.voters + username)
+
+  private def removeVote(poll: Poll, choiceId: String, username: String): Poll =
+    val updatedChoices = poll.choices.map { c =>
+      if c.id == choiceId then c.copy(votes = c.votes - 1, voters = c.voters.filterNot(_ == username))
+      else c
+    }
+    val stillVotingElsewhere = updatedChoices.exists(_.voters.contains(username))
+    val updatedVoters        = if stillVotingElsewhere then poll.voters else poll.voters - username
+    poll.copy(choices = updatedChoices, totalVotes = poll.totalVotes - 1, voters = updatedVoters)
+
+  private def mergeChoices(oldChoices: List[Choice], newChoices: List[Choice]): List[Choice] =
+    newChoices.map { newChoice =>
+      oldChoices.find(_.name == newChoice.name) match
+        case Some(existing) => newChoice.copy(votes = existing.votes, voters = existing.voters)
+        case None           => newChoice
+    }
+
+  private def migrateApprovedVoters(poll: Poll, requireApproval: Boolean): Set[String] =
+    if requireApproval && !poll.requireApproval then poll.approvedVoters ++ poll.voters
+    else poll.approvedVoters
+
   private def toPollResponse(poll: Poll, deleted: Boolean = false): PollResponse =
     val votingModeStr = poll.votingMode match
       case VotingMode.Single   => "single"
@@ -170,34 +199,18 @@ object PollActor:
                       replyTo ! VoteFailure(s"User $username has already voted in this poll (single vote mode)")
                       active(current)
                     else
-                      val updatedChoices = current.choices.map { r =>
-                        if r.id == choiceId then r.copy(votes = r.votes + 1, voters = username :: r.voters)
-                        else r
-                      }
-                      val updatedPoll = current.copy(
-                        choices = updatedChoices,
-                        totalVotes = current.totalVotes + 1,
-                        voters = current.voters + username
-                      )
-                      replyTo ! VoteSuccess(toPollResponse(updatedPoll))
-                      active(updatedPoll)
+                      val updated = castVote(current, choiceId, username)
+                      replyTo ! VoteSuccess(toPollResponse(updated))
+                      active(updated)
 
                   case VotingMode.Multiple =>
                     if choice.voters.contains(username) then
                       replyTo ! VoteFailure(s"User $username has already voted for this choice")
                       active(current)
                     else
-                      val updatedChoices = current.choices.map { r =>
-                        if r.id == choiceId then r.copy(votes = r.votes + 1, voters = username :: r.voters)
-                        else r
-                      }
-                      val updatedPoll = current.copy(
-                        choices = updatedChoices,
-                        totalVotes = current.totalVotes + 1,
-                        voters = current.voters + username
-                      )
-                      replyTo ! VoteSuccess(toPollResponse(updatedPoll))
-                      active(updatedPoll)
+                      val updated = castVote(current, choiceId, username)
+                      replyTo ! VoteSuccess(toPollResponse(updated))
+                      active(updated)
 
         case RemoveVote(choiceId, username, replyTo) =>
           poll.choices.find(_.id == choiceId) match
@@ -209,42 +222,22 @@ object PollActor:
                 replyTo ! RemoveVoteFailure(s"User $username has not voted for this choice")
                 Behaviors.same
               else
-                val updatedChoices = poll.choices.map { r =>
-                  if r.id == choiceId then r.copy(votes = r.votes - 1, voters = r.voters.filterNot(_ == username))
-                  else r
-                }
-                val stillVotingElsewhere = updatedChoices.exists(_.voters.contains(username))
-                val updatedVoters = if stillVotingElsewhere then poll.voters else poll.voters - username
-                val updatedPoll = poll.copy(
-                  choices = updatedChoices,
-                  totalVotes = poll.totalVotes - 1,
-                  voters = updatedVoters
-                )
-                replyTo ! RemoveVoteSuccess(toPollResponse(updatedPoll))
-                active(updatedPoll)
+                val updated = removeVote(poll, choiceId, username)
+                replyTo ! RemoveVoteSuccess(toPollResponse(updated))
+                active(updated)
 
         case UpdatePoll(newPoll, replyTo) =>
           replyTo ! toPollResponse(newPoll)
           active(newPoll)
 
         case EditPoll(title, choices, dailyReset, titleTemplate, requireApproval, anonymousVoting, replyTo) =>
-          val updatedChoices = choices.map { newChoice =>
-            poll.choices.find(_.name == newChoice.name) match
-              case Some(existingChoice) =>
-                newChoice.copy(votes = existingChoice.votes, voters = existingChoice.voters)
-              case None =>
-                newChoice
-          }
-          val newApprovedVoters =
-            if requireApproval && !poll.requireApproval then poll.approvedVoters ++ poll.voters
-            else poll.approvedVoters
           val updatedPoll = poll.copy(
-            title = title,
-            choices = updatedChoices,
-            dailyReset = dailyReset,
-            titleTemplate = titleTemplate,
+            title           = title,
+            choices         = mergeChoices(poll.choices, choices),
+            dailyReset      = dailyReset,
+            titleTemplate   = titleTemplate,
             requireApproval = requireApproval,
-            approvedVoters = newApprovedVoters,
+            approvedVoters  = migrateApprovedVoters(poll, requireApproval),
             anonymousVoting = anonymousVoting
           )
           replyTo ! EditSuccess(toPollResponse(updatedPoll))

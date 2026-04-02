@@ -29,6 +29,28 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
   given timeout: Timeout = 5.seconds
   import system.executionContext
 
+  private def computeWinners(choices: List[Choice]): List[Choice] =
+    val maxVotes = choices.map(_.votes).maxOption.getOrElse(0)
+    if maxVotes == 0 then List.empty
+    else choices.filter(_.votes == maxVotes)
+
+  private def buildCloseSnapshot(poll: PollResponse, closedBy: String): PollSnapshot =
+    val winners = computeWinners(poll.choices)
+    PollSnapshot(
+      snapshotId = UUID.randomUUID().toString,
+      timestamp  = System.currentTimeMillis(),
+      event      = "closed",
+      closedBy   = closedBy,
+      summary    = SnapshotSummary(
+        title           = poll.title,
+        totalVotes      = poll.totalVotes,
+        votingMode      = poll.votingMode,
+        anonymousVoting = poll.anonymousVoting,
+        choices         = poll.choices.map(c => ChoiceSummary(c.name, c.votes, c.voters)),
+        winner          = if winners.size == 1 then Some(winners.head.name) else None
+      )
+    )
+
   private val corsHeaders = List(
     `Access-Control-Allow-Origin`.*,
     `Access-Control-Allow-Methods`(
@@ -233,23 +255,7 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
                       pollManager.ask(PollManager.ClosePollCmd(pollId, _))
                     onSuccess(response) {
                       case PollManager.EditSuccess(updated) =>
-                        val maxVotes = updated.choices.map(_.votes).maxOption.getOrElse(0)
-                        val winners = if maxVotes == 0 then List.empty else updated.choices.filter(_.votes == maxVotes)
-                        val snapshot = PollSnapshot(
-                          snapshotId = UUID.randomUUID().toString,
-                          timestamp  = System.currentTimeMillis(),
-                          event      = "closed",
-                          closedBy   = username,
-                          summary    = SnapshotSummary(
-                            title           = updated.title,
-                            totalVotes      = updated.totalVotes,
-                            votingMode      = updated.votingMode,
-                            anonymousVoting = updated.anonymousVoting,
-                            choices         = updated.choices.map(c => ChoiceSummary(c.name, c.votes, c.voters)),
-                            winner          = if winners.size == 1 then Some(winners.head.name) else None
-                          )
-                        )
-                        HistoryService.appendSnapshot(pollId, updated.title, snapshot)
+                        HistoryService.appendSnapshot(pollId, updated.title, buildCloseSnapshot(updated, username))
                         complete(StatusCodes.OK, updated)
                       case PollManager.EditFailure(message) => complete(StatusCodes.BadRequest, ErrorResponse(message))
                     }

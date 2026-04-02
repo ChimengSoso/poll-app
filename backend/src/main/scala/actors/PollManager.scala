@@ -103,13 +103,25 @@ object PollManager:
   case class VoterActionSuccess(poll: PollResponse) extends VoterActionPollResponse
   case class VoterActionFailure(message: String) extends VoterActionPollResponse
 
+  // Sentinel pushed to SSE subscribers to signal a template list change
+  private val templateUpdateSentinel = PollResponse(
+    id = "__template_updated__", title = "", choices = List.empty,
+    totalVotes = 0, active = false, votingMode = "multiple",
+    createdBy = "", voters = List.empty
+  )
+
   def apply(): Behavior[Command] =
     Behaviors.setup { context =>
-      val polls = mutable.Map[String, ActorRef[PollActor.Command]]()
+      val polls       = mutable.Map[String, ActorRef[PollActor.Command]]()
       val subscribers = mutable.Set[ActorRef[PollUpdate]]()
 
       def notifySubscribers(poll: PollResponse): Unit =
         subscribers.foreach(_ ! PollUpdate(poll))
+
+      def saveTemplateLogged(poll: PollResponse): Unit =
+        TemplateService.saveTemplate(poll) match
+          case scala.util.Success(fileName) => println(s"Saved template: $fileName")
+          case scala.util.Failure(ex)       => println(s"Failed to save template: ${ex.getMessage}")
 
       def behavior(): Behavior[Command] =
         Behaviors.receiveMessage {
@@ -122,12 +134,7 @@ object PollManager:
             Behaviors.same
 
           case BroadcastTemplateUpdate =>
-            val sentinel = PollResponse(
-              id = "__template_updated__", title = "", choices = List.empty,
-              totalVotes = 0, active = false, votingMode = "multiple",
-              createdBy = "", voters = List.empty
-            )
-            notifySubscribers(sentinel)
+            notifySubscribers(templateUpdateSentinel)
             Behaviors.same
 
           case CreatePoll(request, createdBy, replyTo) =>
@@ -291,19 +298,12 @@ object PollManager:
           case DeletePoll(pollId, replyTo) =>
             polls.get(pollId) match
               case Some(pollActor) =>
-                val responseAdapter = context.messageAdapter[PollResponse] { response =>
-                  TemplateService.saveTemplate(response) match
-                    case scala.util.Success(fileName) =>
-                      println(s"Saved template: $fileName")
-                    case scala.util.Failure(ex) =>
-                      println(s"Failed to save template: ${ex.getMessage}")
-
-                  val deletedResponse = response.copy(deleted = true)
-                  notifySubscribers(deletedResponse)
+                def onPollSnapshot(response: PollResponse): WrappedPollResponse =
+                  saveTemplateLogged(response)
+                  notifySubscribers(response.copy(deleted = true))
                   replyTo ! DeleteSuccess(s"Poll $pollId deleted successfully")
                   WrappedPollResponse(response, context.system.ignoreRef)
-                }
-                pollActor ! PollActor.GetPoll(responseAdapter)
+                pollActor ! PollActor.GetPoll(context.messageAdapter(onPollSnapshot))
                 context.stop(pollActor)
                 polls -= pollId
                 Behaviors.same

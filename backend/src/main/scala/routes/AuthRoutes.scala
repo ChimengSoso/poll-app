@@ -35,6 +35,12 @@ class AuthRoutes()(using system: ActorSystem[_]):
 
   private val subscribers = mutable.Set[ActorRef[String]]()
 
+  private def rawEventToSse(raw: String): ServerSentEvent =
+    val colonAt   = raw.indexOf(':')
+    val eventType = raw.substring(0, colonAt)
+    val data      = raw.substring(colonAt + 1)
+    ServerSentEvent(data, eventType = Some(eventType))
+
   private def broadcast(eventType: String, data: String): Unit =
     subscribers.synchronized {
       subscribers.foreach { sub =>
@@ -161,12 +167,7 @@ class AuthRoutes()(using system: ActorSystem[_]):
         path("updates") {
           get {
             val (queue, source) = Source.queue[String](100, OverflowStrategy.dropHead)
-              .map { raw =>
-                val idx       = raw.indexOf(':')
-                val eventType = raw.substring(0, idx)
-                val data      = raw.substring(idx + 1)
-                ServerSentEvent(data, eventType = Some(eventType))
-              }
+              .map(rawEventToSse)
               .keepAlive(15.seconds, () => ServerSentEvent.heartbeat)
               .preMaterialize()
 

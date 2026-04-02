@@ -32,29 +32,23 @@ object TemplateService:
       fileName
     }
   
+  private def parseTemplateFile(file: File): Option[PollTemplate] =
+    Try {
+      val content = new String(Files.readAllBytes(file.toPath))
+      val poll    = content.parseJson.convertTo[PollResponse]
+      PollTemplate(file.getName, poll.id, poll.title, file.lastModified(), poll)
+    }.toOption
+
   // List all templates
   def listTemplates(): Try[List[PollTemplate]] =
     Try {
       init()
       val dir = new File(templatesDir)
-      if !dir.exists() then
-        List.empty
+      if !dir.exists() then List.empty
       else
         dir.listFiles()
           .filter(_.getName.endsWith(".json"))
-          .flatMap { file =>
-            Try {
-              val content = new String(Files.readAllBytes(file.toPath))
-              val poll = content.parseJson.convertTo[PollResponse]
-              PollTemplate(
-                fileName = file.getName,
-                pollId = poll.id,
-                title = poll.title,
-                savedAt = file.lastModified(),
-                poll = poll
-              )
-            }.toOption
-          }
+          .flatMap(parseTemplateFile)
           .toList
           .sortBy(-_.savedAt)
     }
