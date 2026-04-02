@@ -53,6 +53,22 @@ object PollActor:
 
   // ── Pure helpers ────────────────────────────────────────────────────────────
 
+  def votingModeString(mode: VotingMode): String = mode match
+    case VotingMode.Single   => "single"
+    case VotingMode.Multiple => "multiple"
+
+  private def isBlockedByApproval(poll: Poll, username: String): Boolean =
+    poll.requireApproval &&
+    !poll.approvedVoters.contains(username) &&
+    username != poll.createdBy
+
+  private def clearVotes(poll: Poll): Poll =
+    poll.copy(
+      choices    = poll.choices.map(_.copy(votes = 0, voters = List.empty)),
+      totalVotes = 0,
+      voters     = Set.empty
+    )
+
   private def castVote(poll: Poll, choiceId: String, username: String): Poll =
     val updatedChoices = poll.choices.map { c =>
       if c.id == choiceId then c.copy(votes = c.votes + 1, voters = username :: c.voters)
@@ -81,17 +97,13 @@ object PollActor:
     else poll.approvedVoters
 
   private def toPollResponse(poll: Poll, deleted: Boolean = false): PollResponse =
-    val votingModeStr = poll.votingMode match
-      case VotingMode.Single   => "single"
-      case VotingMode.Multiple => "multiple"
-
     PollResponse(
       poll.id,
       poll.title,
       poll.choices,
       poll.totalVotes,
       poll.active,
-      votingModeStr,
+      votingModeString(poll.votingMode),
       poll.createdBy,
       poll.voters.toList,
       deleted,
@@ -162,17 +174,10 @@ object PollActor:
       if poll.lastResetDate.contains(today) then poll
       else
         val newTitle = resolveTitle(poll.titleTemplate, poll.title)
-        poll.copy(
-          title = newTitle,
-          choices = poll.choices.map(_.copy(votes = 0, voters = List.empty)),
-          totalVotes = 0,
-          voters = Set.empty,
-          lastResetDate = Some(today)
-        )
+        clearVotes(poll).copy(title = newTitle, lastResetDate = Some(today))
 
   private def active(poll: Poll): Behavior[Command] =
-    Behaviors.receive { (context, message) =>
-      message match
+    Behaviors.receiveMessage {
         case GetPoll(replyTo) =>
           val current = applyDailyReset(poll)
           replyTo ! toPollResponse(current)
@@ -183,7 +188,7 @@ object PollActor:
           if !current.active then
             replyTo ! VoteFailure("This poll is closed")
             active(current)
-          else if current.requireApproval && !current.approvedVoters.contains(username) && username != current.createdBy then
+          else if isBlockedByApproval(current, username) then
             replyTo ! VoteFailure(s"User $username is not approved to vote in this poll")
             active(current)
           else
@@ -244,12 +249,7 @@ object PollActor:
           active(updatedPoll)
 
         case ResetVotes(replyTo) =>
-          val resetPoll = poll.copy(
-            choices = poll.choices.map(_.copy(votes = 0, voters = List.empty)),
-            totalVotes = 0,
-            voters = Set.empty,
-            active = true
-          )
+          val resetPoll = clearVotes(poll).copy(active = true)
           replyTo ! toPollResponse(resetPoll)
           active(resetPoll)
 

@@ -18,6 +18,7 @@ import org.apache.pekko.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import org.apache.pekko.http.scaladsl.marshalling.sse.EventStreamMarshalling._
 import spray.json._
 import scala.collection.mutable
+import models.{HashedPassword, ResetRequest}
 
 class AuthRoutes()(using system: ActorSystem[_]):
 
@@ -34,6 +35,15 @@ class AuthRoutes()(using system: ActorSystem[_]):
   )
 
   private val subscribers = mutable.Set[ActorRef[String]]()
+
+  private def commitApprovedReset(requestId: String, updated: ResetRequest): Unit =
+    UserService.updatePassword(updated.username, updated.newPasswordHash, updated.newSalt)
+    ResetService.remove(requestId)
+    val payload = JsObject(
+      "requestId" -> JsString(requestId),
+      "username"  -> JsString(updated.username)
+    ).compactPrint
+    broadcast("reset-approved", payload)
 
   private def rawEventToSse(raw: String): ServerSentEvent =
     val colonAt   = raw.indexOf(':')
@@ -76,8 +86,8 @@ class AuthRoutes()(using system: ActorSystem[_]):
                 case Some(_) =>
                   complete(StatusCodes.Conflict, ErrorResponse(s"Username '${req.username}' is already taken"))
                 case None =>
-                  val (hash, salt) = AuthService.hashPassword(req.password)
-                  UserService.createUser(req.username, hash, salt) match
+                  val hp = AuthService.hashPassword(req.password)
+                  UserService.createUser(req.username, hp.hash, hp.salt) match
                     case scala.util.Success(_) =>
                       val token = AuthService.generateToken(req.username)
                       complete(StatusCodes.Created, AuthResponse(token, req.username))
@@ -112,8 +122,8 @@ class AuthRoutes()(using system: ActorSystem[_]):
                     case Some(_) =>
                       complete(StatusCodes.Conflict, ErrorResponse("A reset request is already pending for this user"))
                     case None =>
-                      val (newHash, newSalt) = AuthService.hashPassword(req.newPassword)
-                      val r = ResetService.create(req.username, newHash, newSalt)
+                      val hp = AuthService.hashPassword(req.newPassword)
+                      val r = ResetService.create(req.username, hp.hash, hp.salt)
                       broadcast("reset-update", ResetService.toStatusResponse(r).toJson.compactPrint)
                       complete(StatusCodes.OK, ForgotPasswordResponse(r.id, r.requestedAt + ResetService.EXPIRY_MS))
             }
@@ -135,16 +145,8 @@ class AuthRoutes()(using system: ActorSystem[_]):
                       case None =>
                         complete(StatusCodes.NotFound, ErrorResponse("Reset request not found or expired"))
                       case Some(updated) =>
-                        if ResetService.isApproved(updated) then
-                          UserService.updatePassword(updated.username, updated.newPasswordHash, updated.newSalt)
-                          ResetService.remove(requestId)
-                          val payload = JsObject(
-                            "requestId" -> JsString(requestId),
-                            "username"  -> JsString(updated.username)
-                          ).compactPrint
-                          broadcast("reset-approved", payload)
-                        else
-                          broadcast("reset-update", ResetService.toStatusResponse(updated).toJson.compactPrint)
+                        if ResetService.isApproved(updated) then commitApprovedReset(requestId, updated)
+                        else broadcast("reset-update", ResetService.toStatusResponse(updated).toJson.compactPrint)
                         complete(StatusCodes.OK, ResetService.toStatusResponse(updated))
             }
           }

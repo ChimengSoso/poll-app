@@ -29,6 +29,23 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
   given timeout: Timeout = 5.seconds
   import system.executionContext
 
+  private def pollUpdateToSse(update: PollManager.PollUpdate): ServerSentEvent =
+    ServerSentEvent(update.poll.toJson.compactPrint, eventType = Some("poll-update"))
+
+  private def forwardToPollQueue(queue: SourceQueueWithComplete[PollManager.PollUpdate]): Behavior[PollManager.PollUpdate] =
+    Behaviors.receiveMessage { update => queue.offer(update); Behaviors.same }
+
+  private def recoveredTitle(original: String): String =
+    if original.endsWith(" (Recovered)") then original else s"$original (Recovered)"
+
+  private def toChoiceInputs(choices: List[Choice]): List[ChoiceInput] =
+    choices.map(c => ChoiceInput(c.name, c.description))
+
+  private def completeHistoryMerge(pollId: String, title: String, incoming: PollHistory): Route =
+    HistoryService.mergeAndSave(pollId, title, incoming) match
+      case Success(merged) => complete(StatusCodes.OK, merged)
+      case Failure(ex)     => complete(StatusCodes.BadRequest, ErrorResponse(ex.getMessage))
+
   private def computeWinners(choices: List[Choice]): List[Choice] =
     val maxVotes = choices.map(_.votes).maxOption.getOrElse(0)
     if maxVotes == 0 then List.empty
@@ -95,17 +112,12 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
         path("updates") {
           get {
             val (queue, source) = Source.queue[PollManager.PollUpdate](100, OverflowStrategy.dropHead)
-              .map { update =>
-                ServerSentEvent(update.poll.toJson.compactPrint, eventType = Some("poll-update"))
-              }
+              .map(pollUpdateToSse)
               .keepAlive(15.seconds, () => ServerSentEvent.heartbeat)
               .preMaterialize()
 
             val subscriberActor = system.systemActorOf(
-              Behaviors.receive[PollManager.PollUpdate] { (ctx, update) =>
-                queue.offer(update)
-                Behaviors.same
-              },
+              forwardToPollQueue(queue),
               s"sse-subscriber-${System.nanoTime()}"
             )
 
@@ -353,15 +365,8 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
                 val titleFuture: Future[PollManager.GetPollResponse] =
                   pollManager.ask(PollManager.GetPoll(pollId, _))
                 onSuccess(titleFuture) {
-                  case PollManager.PollFound(poll) =>
-                    HistoryService.mergeAndSave(pollId, poll.title, incoming) match
-                      case Success(merged) => complete(StatusCodes.OK, merged)
-                      case Failure(ex)     => complete(StatusCodes.BadRequest, ErrorResponse(ex.getMessage))
-                  case PollManager.PollNotFound(_) =>
-                    // Poll may not exist in memory (e.g. after restart) — use title from incoming or empty
-                    HistoryService.mergeAndSave(pollId, incoming.pollTitle, incoming) match
-                      case Success(merged) => complete(StatusCodes.OK, merged)
-                      case Failure(ex)     => complete(StatusCodes.BadRequest, ErrorResponse(ex.getMessage))
+                  case PollManager.PollFound(poll)   => completeHistoryMerge(pollId, poll.title, incoming)
+                  case PollManager.PollNotFound(_)   => completeHistoryMerge(pollId, incoming.pollTitle, incoming)
                 }
               }
             }
@@ -391,11 +396,9 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
             authenticated { username =>
               TemplateService.loadTemplate(fileName) match
                 case Success(template) =>
-                  val choices = template.choices.map(r => ChoiceInput(r.name, r.description))
-                  val recoveredTitle = if template.title.endsWith(" (Recovered)") then template.title else s"${template.title} (Recovered)"
                   val request = CreatePollRequest(
-                    title = recoveredTitle,
-                    choices = choices,
+                    title = recoveredTitle(template.title),
+                    choices = toChoiceInputs(template.choices),
                     votingMode = template.votingMode,
                     dailyReset = false,
                     titleTemplate = None,

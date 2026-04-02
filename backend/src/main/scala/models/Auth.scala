@@ -1,5 +1,7 @@
 package models
 
+case class HashedPassword(hash: String, salt: String)
+
 case class User(
   username: String,
   passwordHash: String,

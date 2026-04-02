@@ -6,6 +6,7 @@ import java.security.{SecureRandom, MessageDigest}
 import java.util.Base64
 import java.nio.file.{Files, Paths}
 import scala.util.Try
+import models.HashedPassword
 
 object AuthService:
   private val PBKDF2_ITERATIONS = 65536
@@ -33,12 +34,12 @@ object AuthService:
     mac.init(SecretKeySpec(serverSecret, "HmacSHA256"))
     mac.doFinal(data.getBytes("UTF-8"))
 
-  def hashPassword(password: String): (String, String) =
+  def hashPassword(password: String): HashedPassword =
     val saltBytes = new Array[Byte](16)
     SecureRandom().nextBytes(saltBytes)
     val salt = Base64.getEncoder.encodeToString(saltBytes)
     val hash = pbkdf2(password, saltBytes)
-    (hash, salt)
+    HashedPassword(hash, salt)
 
   def verifyPassword(password: String, hash: String, salt: String): Boolean =
     Try {
