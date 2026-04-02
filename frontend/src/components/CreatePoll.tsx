@@ -233,7 +233,7 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
             <Button type="primary" htmlType="submit" loading={loading} disabled={!canSubmit}>
               Create Poll
             </Button>
-            <Button icon={<DownloadOutlined />} onClick={handleExport}>
+            <Button icon={<DownloadOutlined />} onClick={handleExport} disabled={!canSubmit}>
               Export to File
             </Button>
             <Button icon={<UploadOutlined />} onClick={() => fileInputRef.current?.click()}>
