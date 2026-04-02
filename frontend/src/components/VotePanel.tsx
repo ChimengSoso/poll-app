@@ -176,19 +176,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
           const choice = params.data;
 
           if (isApprovalRequired && !isApproved) {
-            if (isPending) {
-              return <Tag color="orange">Pending approval</Tag>;
-            }
-            return (
-              <Button
-                size="small"
-                onClick={handleRequestToVote}
-                loading={requesting}
-                disabled={!poll.active}
-              >
-                Request to vote
-              </Button>
-            );
+            return <Tag color="red">Not allowed to vote</Tag>;
           }
 
           const userVotedForThis = username ? choice.voters.includes(username) : false;
@@ -225,7 +213,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
         },
       },
     ],
-    [voting, removing, requesting, poll, username, hasUserVoted, isSingleVoteMode, isApprovalRequired, isApproved, isPending]
+    [voting, removing, poll, username, hasUserVoted, isSingleVoteMode, isApprovalRequired, isApproved]
   );
 
   return (
@@ -241,31 +229,47 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
         </Space>
       }
       extra={
-        isOwner ? (
-          <Space>
-            <Button
-              icon={<EditOutlined />}
-              onClick={() => setEditModalVisible(true)}
-            >
-              Edit Poll
-            </Button>
-            <Popconfirm
-              title="Reset all votes?"
-              description="This will reset all votes and everyone can vote again. Are you sure?"
-              onConfirm={handleResetVotes}
-              okText="Yes, reset"
-              cancelText="Cancel"
-            >
+        <Space>
+          {isApprovalRequired && !isApproved && !isOwner && (
+            isPending ? (
+              <Tag color="orange">Pending approval</Tag>
+            ) : (
               <Button
-                danger
-                icon={<ReloadOutlined />}
-                loading={resetting}
+                type="primary"
+                onClick={handleRequestToVote}
+                loading={requesting}
+                disabled={!poll.active}
               >
-                Reset Votes
+                Request to vote
               </Button>
-            </Popconfirm>
-          </Space>
-        ) : undefined
+            )
+          )}
+          {isOwner && (
+            <>
+              <Button
+                icon={<EditOutlined />}
+                onClick={() => setEditModalVisible(true)}
+              >
+                Edit Poll
+              </Button>
+              <Popconfirm
+                title="Reset all votes?"
+                description="This will reset all votes and everyone can vote again. Are you sure?"
+                onConfirm={handleResetVotes}
+                okText="Yes, reset"
+                cancelText="Cancel"
+              >
+                <Button
+                  danger
+                  icon={<ReloadOutlined />}
+                  loading={resetting}
+                >
+                  Reset Votes
+                </Button>
+              </Popconfirm>
+            </>
+          )}
+        </Space>
       }
     >
       {winners.length > 0 && (
@@ -294,10 +298,10 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
           style={{ marginBottom: 16 }}
         />
       )}
-      {isApprovalRequired && !isApproved && !isPending && (
+      {isApprovalRequired && !isApproved && !isPending && !isOwner && (
         <Alert
           message="Approval Required"
-          description="This poll requires approval to vote. Click 'Request to vote' in the Action column."
+          description="This poll requires approval to vote. Click 'Request to vote' in the top-right corner."
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
