@@ -7,6 +7,7 @@ import 'ag-grid-community/styles/ag-theme-alpine.css';
 import type { ColDef } from 'ag-grid-community';
 import { pollApi } from '../services/api';
 import { pollUpdateService } from '../services/pollUpdateService';
+import { useUser } from '../contexts/UserContext';
 import { EditPollModal } from './EditPollModal';
 import type { Poll } from '../types';
 
@@ -16,6 +17,7 @@ interface PollListProps {
 }
 
 export const PollList: React.FC<PollListProps> = ({ refreshTrigger, onPollSelect }) => {
+  const { username } = useUser();
   const [polls, setPolls] = useState<Poll[]>([]);
   const [loading, setLoading] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -63,6 +65,7 @@ export const PollList: React.FC<PollListProps> = ({ refreshTrigger, onPollSelect
   // Subscribe to SSE updates
   useEffect(() => {
     const unsubscribe = pollUpdateService.subscribe((updatedPoll) => {
+      if (updatedPoll.id === '__template_updated__') return;
       console.log('[PollList] Received update for poll:', updatedPoll.id);
       updatePollInList(updatedPoll);
     });
@@ -129,34 +132,43 @@ export const PollList: React.FC<PollListProps> = ({ refreshTrigger, onPollSelect
       {
         headerName: 'Actions',
         flex: 2,
-        cellRenderer: (params: any) => (
-          <Space>
-            <Button
-              type="primary"
-              size="small"
-              onClick={() => onPollSelect(params.data)}
-            >
-              View/Vote
-            </Button>
-            <Button
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(params.data)}
-            >
-              Edit
-            </Button>
-            <Button
-              danger
-              size="small"
-              icon={<DeleteOutlined />}
-              onClick={() => handleDelete(params.data.id)}
-            />
-          </Space>
-        ),
+        cellRenderer: (params: any) => {
+          const isOwner = params.data?.createdBy === username;
+          return (
+            <Space>
+              <Button
+                type="primary"
+                size="small"
+                onClick={() => onPollSelect(params.data)}
+              >
+                View/Vote
+              </Button>
+              {isOwner && (
+                <Button
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => handleEdit(params.data)}
+                >
+                  Edit
+                </Button>
+              )}
+              {isOwner && (
+                <Button
+                  danger
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  onClick={() => handleDelete(params.data.id)}
+                />
+              )}
+            </Space>
+          );
+        },
       },
     ],
-    [onPollSelect]
+    [onPollSelect, username]
   );
+
+  if (!loading && polls.length === 0) return null;
 
   return (
     <Card

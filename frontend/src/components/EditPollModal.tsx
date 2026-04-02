@@ -28,6 +28,7 @@ export const EditPollModal: React.FC<EditPollModalProps> = ({ poll, visible, onC
         dailyReset: poll.dailyReset,
         titleTemplate: poll.titleTemplate || '',
         requireApproval: poll.requireApproval,
+        anonymousVoting: poll.anonymousVoting,
       });
     }
   }, [poll, visible, form]);
@@ -43,6 +44,7 @@ export const EditPollModal: React.FC<EditPollModalProps> = ({ poll, visible, onC
         dailyReset: values.dailyReset || false,
         titleTemplate: values.dailyReset ? (values.titleTemplate || null) : null,
         requireApproval: values.requireApproval || false,
+        anonymousVoting: values.anonymousVoting || false,
       };
 
       const updatedPoll = await pollApi.editPoll(poll!.id, request);
@@ -98,6 +100,15 @@ export const EditPollModal: React.FC<EditPollModalProps> = ({ poll, visible, onC
           name="requireApproval"
           valuePropName="checked"
           tooltip="Users must request and be approved by the poll owner before voting."
+        >
+          <Switch />
+        </Form.Item>
+
+        <Form.Item
+          label="Anonymous Voting"
+          name="anonymousVoting"
+          valuePropName="checked"
+          tooltip="Voter names are hidden from other participants. Only the poll owner can see who voted for what."
         >
           <Switch />
         </Form.Item>

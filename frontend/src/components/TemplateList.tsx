@@ -10,9 +10,10 @@ import type { PollTemplate } from '../types';
 
 interface TemplateListProps {
   onTemplateRecover: () => void;
+  refreshTrigger?: number;
 }
 
-export const TemplateList: React.FC<TemplateListProps> = ({ onTemplateRecover }) => {
+export const TemplateList: React.FC<TemplateListProps> = ({ onTemplateRecover, refreshTrigger }) => {
   const [templates, setTemplates] = useState<PollTemplate[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -29,8 +30,21 @@ export const TemplateList: React.FC<TemplateListProps> = ({ onTemplateRecover })
   };
 
   useEffect(() => {
-    loadTemplates();
-  }, []);
+    let cancelled = false;
+    const load = async () => {
+      try {
+        setLoading(true);
+        const data = await templateApi.getAllTemplates();
+        if (!cancelled) setTemplates(data);
+      } catch (error: any) {
+        if (!cancelled) message.error('Failed to load templates');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [refreshTrigger]);
 
   const handleRecover = async (fileName: string, title: string) => {
     Modal.confirm({
@@ -41,6 +55,7 @@ export const TemplateList: React.FC<TemplateListProps> = ({ onTemplateRecover })
           await templateApi.recoverTemplate(fileName);
           message.success('Poll recovered successfully!');
           onTemplateRecover();
+          loadTemplates();
         } catch (error: any) {
           message.error('Failed to recover poll');
         }

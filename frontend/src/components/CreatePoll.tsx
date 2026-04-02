@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Form, Input, Button, Space, Card, message, Radio, Switch } from 'antd';
-import { MinusCircleOutlined, PlusOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { MinusCircleOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, PlusCircleOutlined } from '@ant-design/icons';
 import { pollApi } from '../services/api';
 import type { CreatePollRequest } from '../types';
 
@@ -11,9 +11,16 @@ interface CreatePollProps {
 export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dailyResetValue = Form.useWatch('dailyReset', form);
+  const titleValue = Form.useWatch('title', form);
+  const choicesValue = Form.useWatch('choices', form);
+
+  const hasTitle = !!(titleValue?.trim());
+  const hasChoice = choicesValue?.some((c: any) => c?.name?.trim());
+  const canSubmit = hasTitle && hasChoice;
 
   const onFinish = async (values: any) => {
     try {
@@ -25,10 +32,12 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
         dailyReset: values.dailyReset || false,
         titleTemplate: values.dailyReset ? (values.titleTemplate || null) : null,
         requireApproval: values.requireApproval || false,
+        anonymousVoting: values.anonymousVoting || false,
       };
       await pollApi.createPoll(request);
       message.success('Poll created successfully!');
       form.resetFields();
+      setOpen(false);
       onPollCreated();
     } catch (error: any) {
       message.error(error.message || 'Failed to create poll');
@@ -96,8 +105,27 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
     }
   };
 
+  if (!open) {
+    return (
+      <div style={{ marginTop: 16 }}>
+        <Button
+          type="dashed"
+          icon={<PlusCircleOutlined />}
+          onClick={() => setOpen(true)}
+          block
+        >
+          Create New Poll
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <Card title="Create New Poll">
+    <Card
+      title="Create New Poll"
+      style={{ marginTop: 16 }}
+      extra={<Button type="text" onClick={() => { setOpen(false); form.resetFields(); }}>Cancel</Button>}
+    >
       <Form
         form={form}
         name="create-poll"
@@ -109,6 +137,7 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
           votingMode: 'multiple',
           dailyReset: false,
           requireApproval: false,
+          anonymousVoting: false,
         }}
       >
         <Form.Item
@@ -144,6 +173,15 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
           name="requireApproval"
           valuePropName="checked"
           tooltip="Users must request and be approved by the poll owner before voting."
+        >
+          <Switch />
+        </Form.Item>
+
+        <Form.Item
+          label="Anonymous Voting"
+          name="anonymousVoting"
+          valuePropName="checked"
+          tooltip="Voter names are hidden from other participants. Only the poll owner can see who voted for what."
         >
           <Switch />
         </Form.Item>
@@ -192,7 +230,7 @@ export const CreatePoll: React.FC<CreatePollProps> = ({ onPollCreated }) => {
 
         <Form.Item>
           <Space>
-            <Button type="primary" htmlType="submit" loading={loading}>
+            <Button type="primary" htmlType="submit" loading={loading} disabled={!canSubmit}>
               Create Poll
             </Button>
             <Button icon={<DownloadOutlined />} onClick={handleExport}>

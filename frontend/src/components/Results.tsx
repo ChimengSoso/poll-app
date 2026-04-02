@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Card, Statistic, Row, Col, Table, Tag, Typography } from 'antd';
 import type { Poll, Choice } from '../types';
 import { TrophyOutlined } from '@ant-design/icons';
+import { useUser } from '../contexts/UserContext';
 
 const { Text } = Typography;
 
@@ -10,6 +11,9 @@ interface ResultsProps {
 }
 
 export const Results: React.FC<ResultsProps> = ({ poll }) => {
+  const { username } = useUser();
+  const isOwner = username === poll.createdBy;
+  const showVoterNames = !poll.anonymousVoting || isOwner;
   const winners = useMemo(() => {
     if (poll.choices.length === 0) return [];
     const maxVotes = Math.max(...poll.choices.map(r => r.votes));
@@ -98,7 +102,7 @@ export const Results: React.FC<ResultsProps> = ({ poll }) => {
             <div style={{ padding: '4px 0' }}>
               {record.voters.length === 0 ? (
                 <Text type="secondary">No votes yet</Text>
-              ) : (
+              ) : showVoterNames ? (
                 <>
                   <Text strong style={{ marginRight: 8 }}>Voted by:</Text>
                   {record.voters.map(voter => (
@@ -107,6 +111,8 @@ export const Results: React.FC<ResultsProps> = ({ poll }) => {
                     </Tag>
                   ))}
                 </>
+              ) : (
+                <Text type="secondary">{record.voters.length} anonymous vote{record.voters.length !== 1 ? 's' : ''}</Text>
               )}
             </div>
           ),

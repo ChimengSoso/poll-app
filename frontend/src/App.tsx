@@ -19,6 +19,7 @@ const { Title } = Typography;
 function MainApp() {
   const { username, logout } = useUser();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [templateRefreshTrigger, setTemplateRefreshTrigger] = useState(0);
   const [selectedPoll, setSelectedPoll] = useState<Poll | null>(null);
   const [activeTab, setActiveTab] = useState('1');
   const [pendingResetsCount, setPendingResetsCount] = useState(0);
@@ -26,12 +27,27 @@ function MainApp() {
   useEffect(() => {
     if (!selectedPoll) return;
     const unsubscribe = pollUpdateService.subscribe((updatedPoll) => {
+      if (updatedPoll.id === '__template_updated__') return;
       if (selectedPoll.id === updatedPoll.id) {
-        setSelectedPoll(updatedPoll);
+        if (updatedPoll.deleted) {
+          setSelectedPoll(null);
+        } else {
+          setSelectedPoll(updatedPoll);
+        }
       }
     });
     return () => unsubscribe();
   }, [selectedPoll?.id]);
+
+  // Reload templates whenever a poll is deleted or a template is added/removed
+  useEffect(() => {
+    const unsubscribe = pollUpdateService.subscribe((updatedPoll) => {
+      if (updatedPoll.deleted || updatedPoll.id === '__template_updated__') {
+        setTemplateRefreshTrigger((prev) => prev + 1);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Keep badge count updated via SSE
   useEffect(() => {
@@ -60,6 +76,13 @@ function MainApp() {
     setRefreshTrigger((prev) => prev + 1);
   };
 
+  // Redirect away from tabs that become hidden
+  useEffect(() => {
+    if (activeTab === '2' && !selectedPoll) setActiveTab('1');
+    if (activeTab === '3' && (!selectedPoll || selectedPoll.totalVotes === 0)) setActiveTab('1');
+    if (activeTab === '5' && pendingResetsCount === 0) setActiveTab('1');
+  }, [selectedPoll, pendingResetsCount, activeTab]);
+
   const tabItems = [
     {
       key: '1',
@@ -71,42 +94,36 @@ function MainApp() {
         </>
       ),
     },
-    {
-      key: '2',
-      label: 'Vote',
-      children: selectedPoll ? (
-        <VotePanel poll={selectedPoll} onVoteSuccess={handleVoteSuccess} />
-      ) : (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <Title level={4}>Select a poll from the Polls tab to vote</Title>
-        </div>
-      ),
-    },
-    {
-      key: '3',
-      label: 'Results',
-      children: selectedPoll ? (
-        <Results poll={selectedPoll} />
-      ) : (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <Title level={4}>Select a poll from the Polls tab to view results</Title>
-        </div>
-      ),
-    },
+    ...(selectedPoll ? [
+      {
+        key: '2',
+        label: 'Vote',
+        children: <VotePanel poll={selectedPoll} onVoteSuccess={handleVoteSuccess} />,
+      },
+    ] : []),
+    ...(selectedPoll && selectedPoll.totalVotes > 0 ? [
+      {
+        key: '3',
+        label: 'Results',
+        children: <Results poll={selectedPoll} />,
+      },
+    ] : []),
     {
       key: '4',
       label: 'Templates',
-      children: <TemplateList onTemplateRecover={handlePollCreated} />,
+      children: <TemplateList onTemplateRecover={handlePollCreated} refreshTrigger={templateRefreshTrigger} />,
     },
-    {
-      key: '5',
-      label: (
-        <Badge count={pendingResetsCount} size="small">
-          <span style={{ paddingRight: pendingResetsCount > 0 ? 8 : 0 }}>Pending Resets</span>
-        </Badge>
-      ),
-      children: <PendingResets onCountChange={setPendingResetsCount} />,
-    },
+    ...(pendingResetsCount > 0 ? [
+      {
+        key: '5',
+        label: (
+          <Badge count={pendingResetsCount} size="small">
+            <span style={{ paddingRight: 8 }}>Pending Resets</span>
+          </Badge>
+        ),
+        children: <PendingResets onCountChange={setPendingResetsCount} />,
+      },
+    ] : []),
   ];
 
   return (

@@ -225,6 +225,7 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
             Total Votes: {poll.totalVotes} | Mode: {poll.votingMode === 'single' ? 'Single Vote' : 'Multiple Votes'} | Created by: {poll.createdBy}
             {poll.dailyReset && ' | Auto-resets daily'}
             {poll.requireApproval && ' | Approval required'}
+            {poll.anonymousVoting && ' | Anonymous voting'}
           </span>
         </Space>
       }

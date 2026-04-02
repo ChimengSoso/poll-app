@@ -21,6 +21,7 @@ export interface Poll {
   requireApproval: boolean;
   approvedVoters: string[];
   pendingVoters: string[];
+  anonymousVoting: boolean;
 }
 
 export interface CreatePollRequest {
@@ -30,6 +31,7 @@ export interface CreatePollRequest {
   dailyReset: boolean;
   titleTemplate: string | null;
   requireApproval: boolean;
+  anonymousVoting: boolean;
 }
 
 export interface ChoiceInput {
@@ -52,6 +54,7 @@ export interface EditPollRequest {
   dailyReset: boolean;
   titleTemplate: string | null;
   requireApproval: boolean;
+  anonymousVoting: boolean;
 }
 
 export interface VoterActionRequest {
