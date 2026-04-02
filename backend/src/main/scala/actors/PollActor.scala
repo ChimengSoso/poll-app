@@ -11,7 +11,7 @@ object PollActor:
   case class Vote(choiceId: String, username: String, replyTo: ActorRef[VoteResponse]) extends Command
   case class RemoveVote(choiceId: String, username: String, replyTo: ActorRef[RemoveVoteResponse]) extends Command
   case class UpdatePoll(poll: Poll, replyTo: ActorRef[PollResponse]) extends Command
-  case class EditPoll(title: String, choices: List[Choice], dailyReset: Boolean, titleTemplate: Option[String], requireApproval: Boolean, replyTo: ActorRef[EditPollResponse]) extends Command
+  case class EditPoll(title: String, choices: List[Choice], dailyReset: Boolean, titleTemplate: Option[String], requireApproval: Boolean, anonymousVoting: Boolean, replyTo: ActorRef[EditPollResponse]) extends Command
   case class ResetVotes(replyTo: ActorRef[PollResponse]) extends Command
   case class RequestToVote(username: String, replyTo: ActorRef[VoterRequestResponse]) extends Command
   case class ApproveVoter(username: String, replyTo: ActorRef[VoterActionResponse]) extends Command
@@ -60,7 +60,8 @@ object PollActor:
       poll.titleTemplate,
       poll.requireApproval,
       poll.approvedVoters.toList,
-      poll.pendingVoters.toList
+      poll.pendingVoters.toList,
+      poll.anonymousVoting
     )
 
   // Returns poll with votes reset and title updated if today is a new day
@@ -165,7 +166,7 @@ object PollActor:
           replyTo ! toPollResponse(newPoll)
           active(newPoll)
 
-        case EditPoll(title, choices, dailyReset, titleTemplate, requireApproval, replyTo) =>
+        case EditPoll(title, choices, dailyReset, titleTemplate, requireApproval, anonymousVoting, replyTo) =>
           val updatedChoices = choices.map { newChoice =>
             poll.choices.find(_.name == newChoice.name) match
               case Some(existingChoice) =>
@@ -182,7 +183,8 @@ object PollActor:
             dailyReset = dailyReset,
             titleTemplate = titleTemplate,
             requireApproval = requireApproval,
-            approvedVoters = newApprovedVoters
+            approvedVoters = newApprovedVoters,
+            anonymousVoting = anonymousVoting
           )
           replyTo ! EditSuccess(toPollResponse(updatedPoll))
           active(updatedPoll)

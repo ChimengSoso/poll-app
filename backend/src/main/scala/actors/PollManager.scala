@@ -13,11 +13,12 @@ object PollManager:
   case class GetAllPolls(replyTo: ActorRef[GetAllPollsResponse]) extends Command
   case class VotePoll(pollId: String, choiceId: String, username: String, replyTo: ActorRef[VotePollResponse]) extends Command
   case class RemovePollVote(pollId: String, choiceId: String, username: String, replyTo: ActorRef[RemovePollVoteResponse]) extends Command
-  case class EditPoll(pollId: String, title: String, choices: List[Choice], dailyReset: Boolean, titleTemplate: Option[String], requireApproval: Boolean, replyTo: ActorRef[EditPollResponse]) extends Command
+  case class EditPoll(pollId: String, title: String, choices: List[Choice], dailyReset: Boolean, titleTemplate: Option[String], requireApproval: Boolean, anonymousVoting: Boolean, replyTo: ActorRef[EditPollResponse]) extends Command
   case class ResetPollVotes(pollId: String, replyTo: ActorRef[ResetPollResponse]) extends Command
   case class DeletePoll(pollId: String, replyTo: ActorRef[DeletePollResponse]) extends Command
   case class Subscribe(subscriber: ActorRef[PollUpdate]) extends Command
   case class Unsubscribe(subscriber: ActorRef[PollUpdate]) extends Command
+  case object BroadcastTemplateUpdate extends Command
   case class RequestPollVote(pollId: String, username: String, replyTo: ActorRef[VoterRequestPollResponse]) extends Command
   case class ApprovePollVoter(pollId: String, username: String, replyTo: ActorRef[VoterActionPollResponse]) extends Command
   case class RejectPollVoter(pollId: String, username: String, replyTo: ActorRef[VoterActionPollResponse]) extends Command
@@ -117,6 +118,15 @@ object PollManager:
             subscribers -= subscriber
             Behaviors.same
 
+          case BroadcastTemplateUpdate =>
+            val sentinel = PollResponse(
+              id = "__template_updated__", title = "", choices = List.empty,
+              totalVotes = 0, active = false, votingMode = "multiple",
+              createdBy = "", voters = List.empty
+            )
+            notifySubscribers(sentinel)
+            Behaviors.same
+
           case CreatePoll(request, createdBy, replyTo) =>
             val votingMode = request.votingMode.toLowerCase match
               case "single" => VotingMode.Single
@@ -129,7 +139,8 @@ object PollManager:
               createdBy = createdBy,
               dailyReset = request.dailyReset,
               titleTemplate = request.titleTemplate,
-              requireApproval = request.requireApproval
+              requireApproval = request.requireApproval,
+              anonymousVoting = request.anonymousVoting
             )
             val pollActor = context.spawn(PollActor(poll), s"poll-${poll.id}")
             polls += (poll.id -> pollActor)
@@ -252,13 +263,13 @@ object PollManager:
             notifySubscribers(response)
             Behaviors.same
 
-          case EditPoll(pollId, title, choices, dailyReset, titleTemplate, requireApproval, replyTo) =>
+          case EditPoll(pollId, title, choices, dailyReset, titleTemplate, requireApproval, anonymousVoting, replyTo) =>
             polls.get(pollId) match
               case Some(pollActor) =>
                 val responseAdapter = context.messageAdapter[PollActor.EditPollResponse] { response =>
                   WrappedEditResponse(response, replyTo)
                 }
-                pollActor ! PollActor.EditPoll(title, choices, dailyReset, titleTemplate, requireApproval, responseAdapter)
+                pollActor ! PollActor.EditPoll(title, choices, dailyReset, titleTemplate, requireApproval, anonymousVoting, responseAdapter)
                 Behaviors.same
               case None =>
                 replyTo ! EditFailure(s"Poll with id $pollId not found")
@@ -285,13 +296,12 @@ object PollManager:
 
                   val deletedResponse = response.copy(deleted = true)
                   notifySubscribers(deletedResponse)
+                  replyTo ! DeleteSuccess(s"Poll $pollId deleted successfully")
                   WrappedPollResponse(response, context.system.ignoreRef)
                 }
                 pollActor ! PollActor.GetPoll(responseAdapter)
-
                 context.stop(pollActor)
                 polls -= pollId
-                replyTo ! DeleteSuccess(s"Poll $pollId deleted successfully")
                 Behaviors.same
               case None =>
                 replyTo ! DeleteFailure(s"Poll with id $pollId not found")

@@ -42,16 +42,18 @@ object TemplateService:
       else
         dir.listFiles()
           .filter(_.getName.endsWith(".json"))
-          .map { file =>
-            val content = new String(Files.readAllBytes(file.toPath))
-            val poll = content.parseJson.convertTo[PollResponse]
-            PollTemplate(
-              fileName = file.getName,
-              pollId = poll.id,
-              title = poll.title,
-              savedAt = file.lastModified(),
-              poll = poll
-            )
+          .flatMap { file =>
+            Try {
+              val content = new String(Files.readAllBytes(file.toPath))
+              val poll = content.parseJson.convertTo[PollResponse]
+              PollTemplate(
+                fileName = file.getName,
+                pollId = poll.id,
+                title = poll.title,
+                savedAt = file.lastModified(),
+                poll = poll
+              )
+            }.toOption
           }
           .toList
           .sortBy(-_.savedAt)

@@ -221,7 +221,7 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
               entity(as[EditPollRequest]) { editRequest =>
                 val choices = editRequest.choices.map(r => Choice(name = r.name, description = r.description))
                 val response: Future[PollManager.EditPollResponse] =
-                  pollManager.ask(PollManager.EditPoll(pollId, editRequest.title, choices, editRequest.dailyReset, editRequest.titleTemplate, editRequest.requireApproval, _))
+                  pollManager.ask(PollManager.EditPoll(pollId, editRequest.title, choices, editRequest.dailyReset, editRequest.titleTemplate, editRequest.requireApproval, editRequest.anonymousVoting, _))
                 onSuccess(response) {
                   case PollManager.EditSuccess(poll) =>
                     complete(StatusCodes.OK, poll)
@@ -258,22 +258,26 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
         } ~
         path(Segment / "recover") { fileName =>
           post {
-            authenticated { _ =>
+            authenticated { username =>
               TemplateService.loadTemplate(fileName) match
                 case Success(template) =>
                   val choices = template.choices.map(r => ChoiceInput(r.name, r.description))
+                  val recoveredTitle = if template.title.endsWith(" (Recovered)") then template.title else s"${template.title} (Recovered)"
                   val request = CreatePollRequest(
-                    title = s"${template.title} (Recovered)",
+                    title = recoveredTitle,
                     choices = choices,
                     votingMode = template.votingMode,
                     dailyReset = false,
                     titleTemplate = None,
-                    requireApproval = false
+                    requireApproval = false,
+                    anonymousVoting = template.anonymousVoting
                   )
                   val response: Future[PollManager.CreatePollResponse] =
-                    pollManager.ask(PollManager.CreatePoll(request, template.createdBy, _))
+                    pollManager.ask(PollManager.CreatePoll(request, username, _))
                   onSuccess(response) {
                     case PollManager.PollCreated(poll) =>
+                      TemplateService.deleteTemplate(fileName)
+                      pollManager ! PollManager.BroadcastTemplateUpdate
                       complete(StatusCodes.Created, poll)
                     case PollManager.PollCreationFailed(message) =>
                       complete(StatusCodes.BadRequest, ErrorResponse(message))
@@ -288,6 +292,7 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
             authenticated { _ =>
               TemplateService.deleteTemplate(fileName) match
                 case Success(true) =>
+                  pollManager ! PollManager.BroadcastTemplateUpdate
                   complete(StatusCodes.OK, DeleteSuccessResponse(s"Template $fileName deleted"))
                 case Success(false) =>
                   complete(StatusCodes.NotFound, ErrorResponse("Template not found"))

@@ -29,7 +29,8 @@ case class Poll(
   lastResetDate: Option[String] = None,
   requireApproval: Boolean = false,
   approvedVoters: Set[String] = Set.empty,
-  pendingVoters: Set[String] = Set.empty
+  pendingVoters: Set[String] = Set.empty,
+  anonymousVoting: Boolean = false
 )
 
 case class CreatePollRequest(
@@ -38,7 +39,8 @@ case class CreatePollRequest(
   votingMode: String = "multiple",
   dailyReset: Boolean,
   titleTemplate: Option[String],
-  requireApproval: Boolean
+  requireApproval: Boolean,
+  anonymousVoting: Boolean
 )
 
 case class ChoiceInput(
@@ -55,7 +57,8 @@ case class EditPollRequest(
   choices: List[ChoiceInput],
   dailyReset: Boolean,
   titleTemplate: Option[String],
-  requireApproval: Boolean
+  requireApproval: Boolean,
+  anonymousVoting: Boolean
 )
 
 case class PollResponse(
@@ -72,7 +75,8 @@ case class PollResponse(
   titleTemplate: Option[String] = None,
   requireApproval: Boolean = false,
   approvedVoters: List[String] = List.empty,
-  pendingVoters: List[String] = List.empty
+  pendingVoters: List[String] = List.empty,
+  anonymousVoting: Boolean = false
 )
 
 case class ErrorResponse(message: String)
