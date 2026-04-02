@@ -81,3 +81,4 @@ case class PollResponse(
 
 case class ErrorResponse(message: String)
 case class VoterActionRequest(username: String)
+case class ReopenRequest(password: String)

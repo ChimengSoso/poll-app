@@ -75,6 +75,12 @@ export const pollApi = {
 
   revokeVoter: (pollId: string, username: string): Promise<Poll> =>
     request<Poll>(`/polls/${pollId}/voters/${encodeURIComponent(username)}`, { method: 'DELETE' }),
+
+  closePoll: (pollId: string): Promise<Poll> =>
+    request<Poll>(`/polls/${pollId}/close`, { method: 'POST' }),
+
+  reopenPoll: (pollId: string, password: string): Promise<Poll> =>
+    request<Poll>(`/polls/${pollId}/reopen`, { method: 'POST', body: JSON.stringify({ password }) }),
 };
 
 export const templateApi = {

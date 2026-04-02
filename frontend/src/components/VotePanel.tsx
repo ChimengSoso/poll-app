@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Card, Button, Space, message, Progress, Tag, Alert, Popconfirm, List, Typography } from 'antd';
-import { ReloadOutlined, EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
+import { Card, Button, Space, message, Progress, Tag, Alert, Popconfirm, List, Typography, Modal, Input } from 'antd';
+import { ReloadOutlined, EditOutlined, CheckOutlined, CloseOutlined, LockOutlined } from '@ant-design/icons';
 import { AgGridReact } from 'ag-grid-react';
 import type { ColDef } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
@@ -20,6 +20,11 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
   const [removing, setRemoving] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [requesting, setRequesting] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [reopenModalVisible, setReopenModalVisible] = useState(false);
+  const [reopenPassword, setReopenPassword] = useState('');
+  const [reopenLoading, setReopenLoading] = useState(false);
+  const [reopenError, setReopenError] = useState('');
   const [editModalVisible, setEditModalVisible] = useState(false);
   const { username } = useUser();
 
@@ -83,6 +88,35 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
       message.error(error.message || 'Failed to send request');
     } finally {
       setRequesting(false);
+    }
+  };
+
+  const handleClosePoll = async () => {
+    try {
+      setClosing(true);
+      const updatedPoll = await pollApi.closePoll(poll.id);
+      message.success('Poll closed.');
+      onVoteSuccess(updatedPoll);
+    } catch (error: any) {
+      message.error(error.message || 'Failed to close poll');
+    } finally {
+      setClosing(false);
+    }
+  };
+
+  const handleReopenPoll = async () => {
+    try {
+      setReopenLoading(true);
+      setReopenError('');
+      const updatedPoll = await pollApi.reopenPoll(poll.id, reopenPassword);
+      message.success('Poll reopened.');
+      onVoteSuccess(updatedPoll);
+      setReopenModalVisible(false);
+      setReopenPassword('');
+    } catch (error: any) {
+      setReopenError(error.message || 'Failed to reopen poll');
+    } finally {
+      setReopenLoading(false);
     }
   };
 
@@ -253,9 +287,30 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
               >
                 Edit Poll
               </Button>
+              {poll.active ? (
+                <Popconfirm
+                  title="Close this poll?"
+                  description="Voting will be disabled for all users until the poll is reopened."
+                  onConfirm={handleClosePoll}
+                  okText="Close Poll"
+                  cancelText="Cancel"
+                >
+                  <Button icon={<LockOutlined />} loading={closing}>
+                    Close Poll
+                  </Button>
+                </Popconfirm>
+              ) : (
+                <Button
+                  type="primary"
+                  icon={<LockOutlined />}
+                  onClick={() => { setReopenPassword(''); setReopenError(''); setReopenModalVisible(true); }}
+                >
+                  Re-open Poll
+                </Button>
+              )}
               <Popconfirm
                 title="Reset all votes?"
-                description="This will reset all votes and everyone can vote again. Are you sure?"
+                description="This will reset all votes and reopen the poll. Are you sure?"
                 onConfirm={handleResetVotes}
                 okText="Yes, reset"
                 cancelText="Cancel"
@@ -273,6 +328,15 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
         </Space>
       }
     >
+      {!poll.active && (
+        <Alert
+          message="Poll Closed"
+          description={isOwner ? 'This poll is closed. Click "Re-open Poll" to allow voting again, or "Reset Votes" to clear votes and reopen.' : 'This poll has been closed by the owner. No further votes are accepted.'}
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
       {winners.length > 0 && (
         <Alert
           message={
@@ -410,6 +474,28 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
         onClose={() => setEditModalVisible(false)}
         onSuccess={onVoteSuccess}
       />
+
+      <Modal
+        title="Re-open Poll"
+        open={reopenModalVisible}
+        onOk={handleReopenPoll}
+        onCancel={() => setReopenModalVisible(false)}
+        confirmLoading={reopenLoading}
+        okText="Re-open"
+      >
+        <p>Enter your password to confirm you want to reopen this poll.</p>
+        <Input.Password
+          prefix={<LockOutlined />}
+          placeholder="Your password"
+          value={reopenPassword}
+          onChange={e => { setReopenPassword(e.target.value); setReopenError(''); }}
+          onPressEnter={handleReopenPoll}
+          autoFocus
+        />
+        {reopenError && (
+          <Alert message={reopenError} type="error" showIcon style={{ marginTop: 8 }} />
+        )}
+      </Modal>
     </Card>
   );
 };

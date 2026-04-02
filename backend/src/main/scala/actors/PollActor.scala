@@ -17,6 +17,8 @@ object PollActor:
   case class ApproveVoter(username: String, replyTo: ActorRef[VoterActionResponse]) extends Command
   case class RejectVoter(username: String, replyTo: ActorRef[VoterActionResponse]) extends Command
   case class RevokeVoter(username: String, replyTo: ActorRef[VoterActionResponse]) extends Command
+  case class ClosePoll(replyTo: ActorRef[EditPollResponse]) extends Command
+  case class ReopenPoll(replyTo: ActorRef[EditPollResponse]) extends Command
 
   sealed trait VoteResponse
   case class VoteSuccess(poll: PollResponse) extends VoteResponse
@@ -92,7 +94,10 @@ object PollActor:
 
         case Vote(choiceId, username, replyTo) =>
           val current = applyDailyReset(poll)
-          if current.requireApproval && !current.approvedVoters.contains(username) && username != current.createdBy then
+          if !current.active then
+            replyTo ! VoteFailure("This poll is closed")
+            active(current)
+          else if current.requireApproval && !current.approvedVoters.contains(username) && username != current.createdBy then
             replyTo ! VoteFailure(s"User $username is not approved to vote in this poll")
             active(current)
           else
@@ -193,7 +198,8 @@ object PollActor:
           val resetPoll = poll.copy(
             choices = poll.choices.map(_.copy(votes = 0, voters = List.empty)),
             totalVotes = 0,
-            voters = Set.empty
+            voters = Set.empty,
+            active = true
           )
           replyTo ! toPollResponse(resetPoll)
           active(resetPoll)
@@ -239,4 +245,14 @@ object PollActor:
             val updatedPoll = poll.copy(approvedVoters = poll.approvedVoters - username)
             replyTo ! VoterActionSuccess(toPollResponse(updatedPoll))
             active(updatedPoll)
+
+        case ClosePoll(replyTo) =>
+          val updated = poll.copy(active = false)
+          replyTo ! EditSuccess(toPollResponse(updated))
+          active(updated)
+
+        case ReopenPoll(replyTo) =>
+          val updated = poll.copy(active = true)
+          replyTo ! EditSuccess(toPollResponse(updated))
+          active(updated)
     }

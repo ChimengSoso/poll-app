@@ -193,6 +193,56 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
             }
           }
         } ~
+        path(Segment / "close") { pollId =>
+          post {
+            authenticated { username =>
+              val getResponse: Future[PollManager.GetPollResponse] =
+                pollManager.ask(PollManager.GetPoll(pollId, _))
+              onSuccess(getResponse) {
+                case PollManager.PollFound(poll) =>
+                  if poll.createdBy != username then
+                    complete(StatusCodes.Forbidden, ErrorResponse("Only the poll owner can close this poll"))
+                  else
+                    val response: Future[PollManager.EditPollResponse] =
+                      pollManager.ask(PollManager.ClosePollCmd(pollId, _))
+                    onSuccess(response) {
+                      case PollManager.EditSuccess(updated) => complete(StatusCodes.OK, updated)
+                      case PollManager.EditFailure(message) => complete(StatusCodes.BadRequest, ErrorResponse(message))
+                    }
+                case PollManager.PollNotFound(message) =>
+                  complete(StatusCodes.NotFound, ErrorResponse(message))
+              }
+            }
+          }
+        } ~
+        path(Segment / "reopen") { pollId =>
+          post {
+            authenticated { username =>
+              entity(as[ReopenRequest]) { req =>
+                val getResponse: Future[PollManager.GetPollResponse] =
+                  pollManager.ask(PollManager.GetPoll(pollId, _))
+                onSuccess(getResponse) {
+                  case PollManager.PollFound(poll) =>
+                    if poll.createdBy != username then
+                      complete(StatusCodes.Forbidden, ErrorResponse("Only the poll owner can reopen this poll"))
+                    else
+                      services.UserService.findUser(username) match
+                        case Some(user) if services.AuthService.verifyPassword(req.password, user.passwordHash, user.salt) =>
+                          val response: Future[PollManager.EditPollResponse] =
+                            pollManager.ask(PollManager.ReopenPollCmd(pollId, _))
+                          onSuccess(response) {
+                            case PollManager.EditSuccess(updated) => complete(StatusCodes.OK, updated)
+                            case PollManager.EditFailure(message) => complete(StatusCodes.BadRequest, ErrorResponse(message))
+                          }
+                        case _ =>
+                          complete(StatusCodes.Unauthorized, ErrorResponse("Incorrect password"))
+                  case PollManager.PollNotFound(message) =>
+                    complete(StatusCodes.NotFound, ErrorResponse(message))
+                }
+              }
+            }
+          }
+        } ~
         path(Segment / "results") { pollId =>
           get {
             val response: Future[PollManager.GetPollResponse] =

@@ -57,3 +57,4 @@ object JsonFormats extends DefaultJsonProtocol:
   implicit val deleteSuccessResponseFormat: RootJsonFormat[DeleteSuccessResponse] = jsonFormat1(DeleteSuccessResponse.apply)
   implicit val pollTemplateListItemFormat: RootJsonFormat[PollTemplateListItem] = jsonFormat4(PollTemplateListItem.apply)
   implicit val voterActionRequestFormat: RootJsonFormat[VoterActionRequest] = jsonFormat1(VoterActionRequest.apply)
+  implicit val reopenRequestFormat: RootJsonFormat[ReopenRequest] = jsonFormat1(ReopenRequest.apply)

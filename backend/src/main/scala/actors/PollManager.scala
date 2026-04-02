@@ -23,6 +23,8 @@ object PollManager:
   case class ApprovePollVoter(pollId: String, username: String, replyTo: ActorRef[VoterActionPollResponse]) extends Command
   case class RejectPollVoter(pollId: String, username: String, replyTo: ActorRef[VoterActionPollResponse]) extends Command
   case class RevokePollVoter(pollId: String, username: String, replyTo: ActorRef[VoterActionPollResponse]) extends Command
+  case class ClosePollCmd(pollId: String, replyTo: ActorRef[EditPollResponse]) extends Command
+  case class ReopenPollCmd(pollId: String, replyTo: ActorRef[EditPollResponse]) extends Command
 
   case class PollUpdate(poll: PollResponse)
 
@@ -372,6 +374,30 @@ object PollManager:
               case PollActor.VoterActionFailure(message) =>
                 originalReplyTo ! VoterActionFailure(message)
             Behaviors.same
+
+          case ClosePollCmd(pollId, replyTo) =>
+            polls.get(pollId) match
+              case Some(pollActor) =>
+                val adapter = context.messageAdapter[PollActor.EditPollResponse] { response =>
+                  WrappedEditResponse(response, replyTo)
+                }
+                pollActor ! PollActor.ClosePoll(adapter)
+                Behaviors.same
+              case None =>
+                replyTo ! EditFailure(s"Poll $pollId not found")
+                Behaviors.same
+
+          case ReopenPollCmd(pollId, replyTo) =>
+            polls.get(pollId) match
+              case Some(pollActor) =>
+                val adapter = context.messageAdapter[PollActor.EditPollResponse] { response =>
+                  WrappedEditResponse(response, replyTo)
+                }
+                pollActor ! PollActor.ReopenPoll(adapter)
+                Behaviors.same
+              case None =>
+                replyTo ! EditFailure(s"Poll $pollId not found")
+                Behaviors.same
         }
 
       behavior()
