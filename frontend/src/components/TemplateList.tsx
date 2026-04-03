@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { Card, Button, Space, Modal, message } from 'antd';
-import { ReloadOutlined, DeleteOutlined, RollbackOutlined } from '@ant-design/icons';
+import { DeleteOutlined, RollbackOutlined } from '@ant-design/icons';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import type { ColDef } from 'ag-grid-community';
@@ -15,7 +15,7 @@ interface TemplateListProps {
 
 export const TemplateList: React.FC<TemplateListProps> = ({ onTemplateRecover, refreshTrigger }) => {
   const [templates, setTemplates] = useState<PollTemplate[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
 
   const loadTemplates = async () => {
     try {
@@ -23,7 +23,7 @@ export const TemplateList: React.FC<TemplateListProps> = ({ onTemplateRecover, r
       const data = await templateApi.getAllTemplates();
       setTemplates(data);
     } catch (error: any) {
-      message.error('Failed to load templates');
+      message.error('Failed to load recycle bin');
     } finally {
       setLoading(false);
     }
@@ -65,15 +65,15 @@ export const TemplateList: React.FC<TemplateListProps> = ({ onTemplateRecover, r
 
   const handleDelete = async (fileName: string) => {
     Modal.confirm({
-      title: 'Delete Template',
-      content: 'Are you sure you want to delete this template?',
+      title: 'Delete Permanently',
+      content: 'Are you sure you want to permanently delete this poll from the recycle bin?',
       onOk: async () => {
         try {
           await templateApi.deleteTemplate(fileName);
-          message.success('Template deleted successfully');
+          message.success('Permanently deleted.');
           loadTemplates();
         } catch (error: any) {
-          message.error('Failed to delete template');
+          message.error('Failed to delete.');
         }
       },
     });
@@ -131,14 +131,7 @@ export const TemplateList: React.FC<TemplateListProps> = ({ onTemplateRecover, r
   );
 
   return (
-    <Card
-      title="Poll Templates (Deleted Polls Backup)"
-      extra={
-        <Button icon={<ReloadOutlined />} onClick={loadTemplates} loading={loading}>
-          Refresh
-        </Button>
-      }
-    >
+    <Card>
       <div className="ag-theme-alpine" style={{ height: 400, width: '100%' }}>
         <AgGridReact
           rowData={templates}

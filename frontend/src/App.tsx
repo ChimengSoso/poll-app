@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Layout, Tabs, Dropdown, Badge } from 'antd';
-import { LogoutOutlined, UserOutlined } from '@ant-design/icons';
+import { Layout, Tabs, Dropdown, Badge, Modal, Typography } from 'antd';
+import { LogoutOutlined, UserOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+const { Header, Content, Footer } = Layout;
+const { Title, Paragraph, Text } = Typography;
 import { UserProvider, useUser } from './contexts/UserContext';
 import { Login } from './components/Login';
 import { CreatePoll } from './components/CreatePoll';
@@ -14,10 +16,9 @@ import { pollUpdateService } from './services/pollUpdateService';
 import { authUpdateService } from './services/authUpdateService';
 import type { Poll } from './types';
 
-const { Header, Content } = Layout;
-
 function MainApp() {
   const { username, logout } = useUser();
+  const [guideVisible, setGuideVisible] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [templateRefreshTrigger, setTemplateRefreshTrigger] = useState(0);
   const [selectedPoll, setSelectedPoll] = useState<Poll | null>(null);
@@ -110,7 +111,7 @@ function MainApp() {
     ] : []),
     {
       key: '4',
-      label: 'Templates',
+      label: 'Recycle Bin',
       children: <TemplateList onTemplateRecover={handlePollCreated} refreshTrigger={templateRefreshTrigger} />,
     },
     ...(pendingResetsCount > 0 ? [
@@ -142,25 +143,19 @@ function MainApp() {
       }}>
         <div onClick={() => setActiveTab('1')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, margin: '16px 0' }}>
           <span style={{ fontSize: 26 }}>🗳️</span>
-          <span style={{
-            fontSize: 26,
-            fontWeight: 800,
-            letterSpacing: '0.08em',
-            background: 'linear-gradient(90deg, #fff 0%, #fadb14 40%, #fff 70%, #fadb14 100%)',
-            backgroundSize: '200% auto',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            textTransform: 'uppercase',
-            animation: 'mirror-flash 3s linear infinite',
-          }}>
-            OpenPoll
-          </span>
+          <span className="logo-text">OpenPoll</span>
         </div>
         <Dropdown
           menu={{
-            items: [{ key: 'logout', icon: <LogoutOutlined />, label: 'Logout', danger: true }],
-            onClick: ({ key }) => { if (key === 'logout') logout(); },
+            items: [
+              { key: 'guide', icon: <QuestionCircleOutlined />, label: 'Guide' },
+              { type: 'divider' },
+              { key: 'logout', icon: <LogoutOutlined />, label: 'Logout', danger: true },
+            ],
+            onClick: ({ key }) => {
+              if (key === 'logout') logout();
+              if (key === 'guide') setGuideVisible(true);
+            },
           }}
           trigger={['click']}
         >
@@ -175,6 +170,52 @@ function MainApp() {
           <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} size="large" />
         </div>
       </Content>
+      <Footer style={{ textAlign: 'center', background: '#001529', color: 'rgba(255,255,255,0.35)', fontSize: 12, padding: '12px 24px' }}>
+        © {new Date().getFullYear()} OpenPoll. All rights reserved.
+      </Footer>
+
+      <Modal
+        title="OpenPoll Guide"
+        open={guideVisible}
+        onCancel={() => setGuideVisible(false)}
+        footer={null}
+        width={640}
+      >
+        <Typography>
+          <Title level={5}>🗳️ Polls</Title>
+          <Paragraph>Create a poll with one or more choices. Each poll belongs to its creator (owner).</Paragraph>
+
+          <Title level={5}>🗳️ Voting Modes</Title>
+          <Paragraph>
+            <Text strong>Single</Text> — each voter may pick exactly one choice.<br />
+            <Text strong>Multiple</Text> — each voter may vote for any number of choices.
+          </Paragraph>
+
+          <Title level={5}>🔒 Approval Required</Title>
+          <Paragraph>When enabled, voters must request access. The owner approves or rejects each request before they can vote.</Paragraph>
+
+          <Title level={5}>👤 Anonymous Voting</Title>
+          <Paragraph>Voter names are hidden from other participants. Only the poll owner can see who voted for what.</Paragraph>
+
+          <Title level={5}>📅 Daily Reset</Title>
+          <Paragraph>
+            Votes are automatically cleared each day. Use <Text code>{'{date}'}</Text> or <Text code>{'{date_th}'}</Text> in the title template for a Thai date, or <Text code>{'{date_en}'}</Text> for English format.<br />
+            The owner can also trigger a <Text strong>Force Daily Reset</Text> manually (requires password).
+          </Paragraph>
+
+          <Title level={5}>🔐 Close &amp; Re-open</Title>
+          <Paragraph>The owner can close a poll to stop voting. Re-opening requires password confirmation. Every close is recorded in History.</Paragraph>
+
+          <Title level={5}>📜 History</Title>
+          <Paragraph>Every time a poll is closed, a snapshot is saved. History persists even after the poll is deleted. You can export and import history as a JSON file.</Paragraph>
+
+          <Title level={5}>🗑️ Recycle Bin</Title>
+          <Paragraph>Deleted polls are moved here. You can restore (recover) them back as active polls, or permanently delete them.</Paragraph>
+
+          <Title level={5}>🔑 Forgot Password</Title>
+          <Paragraph>Submit a password reset request. It requires approval votes from <Text strong>5 other users</Text> before the new password takes effect.</Paragraph>
+        </Typography>
+      </Modal>
     </Layout>
   );
 }

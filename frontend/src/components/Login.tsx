@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, Input, Button, Form, Typography, Alert, Progress } from 'antd';
+import { Card, Input, Button, Form, Typography, Alert, Progress, Collapse } from 'antd';
 import { UserOutlined, LockOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { authApi } from '../services/authApi';
 import { authUpdateService } from '../services/authUpdateService';
@@ -184,7 +184,22 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setStep(target);
   };
 
-  const card = (content: React.ReactNode) => (
+  const guideItems = [
+    {
+      key: '1',
+      label: <Text strong>🚀 How to get started?</Text>,
+      children: (
+        <Typography style={{ fontSize: 13 }}>
+          <Paragraph><Text strong>1. Enter your username</Text> — type any username and press Next.</Paragraph>
+          <Paragraph><Text strong>2. New user?</Text> — set a password to create your account instantly.</Paragraph>
+          <Paragraph><Text strong>3. Returning user?</Text> — enter your password to log in.</Paragraph>
+          <Paragraph style={{ marginBottom: 0 }}><Text strong>4. Forgot password?</Text> — submit a reset request. It requires approval from 5 other users before your new password takes effect.</Paragraph>
+        </Typography>
+      ),
+    },
+  ];
+
+  const card = (content: React.ReactNode, showGuide = false) => (
     <div style={{
       display: 'flex',
       justifyContent: 'center',
@@ -193,14 +208,23 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       padding: '20px',
     }}>
-      <Card style={{ maxWidth: 460, width: '100%', boxShadow: '0 10px 40px rgba(0,0,0,0.2)', borderRadius: 12 }}>
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontSize: 64, marginBottom: 12 }}>🗳️</div>
-          <Title level={2} style={{ marginBottom: 4 }}>OpenPoll</Title>
-          <Paragraph type="secondary">Create polls and vote on anything with your team</Paragraph>
-        </div>
-        {content}
-      </Card>
+      <div style={{ maxWidth: 460, width: '100%' }}>
+        <Card style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.2)', borderRadius: 12, marginBottom: showGuide ? 16 : 0 }}>
+          <div style={{ textAlign: 'center', marginBottom: 28 }}>
+            <div style={{ fontSize: 64, marginBottom: 12 }}>🗳️</div>
+            <Title level={2} style={{ marginBottom: 4 }}>OpenPoll</Title>
+            <Paragraph type="secondary">Create polls and vote on anything with your team</Paragraph>
+          </div>
+          {content}
+        </Card>
+        {showGuide && (
+          <Collapse
+            items={guideItems}
+            ghost
+            style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 12, color: 'white' }}
+          />
+        )}
+      </div>
     </div>
   );
 
@@ -221,7 +245,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <Button type="primary" htmlType="submit" block loading={loading}>Next</Button>
         </Form.Item>
       </Form>
-    );
+    , true);
   }
 
   // ── Step 2b: Login ────────────────────────────────────────────────────────
