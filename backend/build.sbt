@@ -4,15 +4,18 @@ version := "1.0.0"
 
 scalaVersion := "3.3.1"
 
-val PekkoVersion = "1.0.2"
+val PekkoVersion     = "1.0.2"
 val PekkoHttpVersion = "1.0.1"
+val CirceVersion     = "0.14.6"
 
 libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-actor-typed" % PekkoVersion,
-  "org.apache.pekko" %% "pekko-stream" % PekkoVersion,
-  "org.apache.pekko" %% "pekko-http" % PekkoHttpVersion,
-  "org.apache.pekko" %% "pekko-http-spray-json" % PekkoHttpVersion,
-  "ch.qos.logback" % "logback-classic" % "1.4.11"
+  "org.apache.pekko" %% "pekko-stream"      % PekkoVersion,
+  "org.apache.pekko" %% "pekko-http"        % PekkoHttpVersion,
+  "io.circe"         %% "circe-core"         % CirceVersion,
+  "io.circe"         %% "circe-generic"      % CirceVersion,
+  "io.circe"         %% "circe-parser"       % CirceVersion,
+  "ch.qos.logback"   %  "logback-classic"    % "1.4.11"
 )
 
 Compile / run / mainClass := Some("Main")

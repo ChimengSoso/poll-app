@@ -16,12 +16,9 @@ import scala.concurrent.Future
 import actors.PollManager
 import models._
 import services.{TemplateService, HistoryService}
-import json.HistoryJsonFormats.{_, given}
-import json.JsonFormats.{_, given}
-import json.{DeleteSuccessResponse, PollTemplateListItem}
-import org.apache.pekko.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import json.CirceSupport.given
+import io.circe.syntax._
 import org.apache.pekko.http.scaladsl.marshalling.sse.EventStreamMarshalling._
-import spray.json._
 import scala.util.{Success, Failure}
 import java.util.UUID
 
@@ -30,7 +27,7 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
   import system.executionContext
 
   private def pollUpdateToSse(update: PollManager.PollUpdate): ServerSentEvent =
-    ServerSentEvent(update.poll.toJson.compactPrint, eventType = Some("poll-update"))
+    ServerSentEvent(update.poll.asJson.noSpaces, eventType = Some("poll-update"))
 
   private def forwardToPollQueue(queue: SourceQueueWithComplete[PollManager.PollUpdate]): Behavior[PollManager.PollUpdate] =
     Behaviors.receiveMessage { update => queue.offer(update); Behaviors.same }
@@ -91,7 +88,7 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
             val response: Future[PollManager.GetAllPollsResponse] =
               pollManager.ask(PollManager.GetAllPolls.apply)
             onSuccess(response) { result =>
-              complete(StatusCodes.OK, result.polls.toJson)
+              complete(StatusCodes.OK, result.polls)
             }
           } ~
           post {
@@ -386,7 +383,7 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
             TemplateService.listTemplates() match
               case Success(templates) =>
                 val items = templates.map(t => PollTemplateListItem(t.fileName, t.pollId, t.title, t.savedAt))
-                complete(StatusCodes.OK, items.toJson)
+                complete(StatusCodes.OK, items)
               case Failure(ex) =>
                 complete(StatusCodes.InternalServerError, ErrorResponse(s"Failed to list templates: ${ex.getMessage}"))
           }

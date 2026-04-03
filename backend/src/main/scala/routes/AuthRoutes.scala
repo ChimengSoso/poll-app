@@ -12,13 +12,11 @@ import org.apache.pekko.stream.OverflowStrategy
 import scala.concurrent.duration._
 import services.{AuthService, UserService, ResetService}
 import models._
-import json.JsonFormats.{_, given}
-import json.AuthJsonFormats.{_, given}
-import org.apache.pekko.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import json.CirceSupport.given
+import io.circe.syntax._
+import io.circe.Json
 import org.apache.pekko.http.scaladsl.marshalling.sse.EventStreamMarshalling._
-import spray.json._
 import scala.collection.mutable
-import models.{HashedPassword, ResetRequest}
 
 class AuthRoutes()(using system: ActorSystem[_]):
 
@@ -39,10 +37,10 @@ class AuthRoutes()(using system: ActorSystem[_]):
   private def commitApprovedReset(requestId: String, updated: ResetRequest): Unit =
     UserService.updatePassword(updated.username, updated.newPasswordHash, updated.newSalt)
     ResetService.remove(requestId)
-    val payload = JsObject(
-      "requestId" -> JsString(requestId),
-      "username"  -> JsString(updated.username)
-    ).compactPrint
+    val payload = Json.obj(
+      "requestId" -> Json.fromString(requestId),
+      "username"  -> Json.fromString(updated.username)
+    ).noSpaces
     broadcast("reset-approved", payload)
 
   private def rawEventToSse(raw: String): ServerSentEvent =
@@ -124,7 +122,7 @@ class AuthRoutes()(using system: ActorSystem[_]):
                     case None =>
                       val hp = AuthService.hashPassword(req.newPassword)
                       val r = ResetService.create(req.username, hp.hash, hp.salt)
-                      broadcast("reset-update", ResetService.toStatusResponse(r).toJson.compactPrint)
+                      broadcast("reset-update", ResetService.toStatusResponse(r).asJson.noSpaces)
                       complete(StatusCodes.OK, ForgotPasswordResponse(r.id, r.requestedAt + ResetService.EXPIRY_MS))
             }
           }
@@ -146,7 +144,7 @@ class AuthRoutes()(using system: ActorSystem[_]):
                         complete(StatusCodes.NotFound, ErrorResponse("Reset request not found or expired"))
                       case Some(updated) =>
                         if ResetService.isApproved(updated) then commitApprovedReset(requestId, updated)
-                        else broadcast("reset-update", ResetService.toStatusResponse(updated).toJson.compactPrint)
+                        else broadcast("reset-update", ResetService.toStatusResponse(updated).asJson.noSpaces)
                         complete(StatusCodes.OK, ResetService.toStatusResponse(updated))
             }
           }
@@ -162,7 +160,7 @@ class AuthRoutes()(using system: ActorSystem[_]):
           get {
             authenticated { _ =>
               val active = ResetService.listActive().map(ResetService.toStatusResponse)
-              complete(StatusCodes.OK, active.toJson)
+              complete(StatusCodes.OK, active)
             }
           }
         } ~

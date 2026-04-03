@@ -1,8 +1,8 @@
 package services
 
 import models._
-import spray.json._
-import json.HistoryJsonFormats._
+import io.circe.parser.decode
+import io.circe.syntax._
 import java.nio.file.{Files, Paths}
 import java.io.File
 import scala.util.{Try, Success, Failure}
@@ -21,8 +21,7 @@ object HistoryService:
       init()
       val path = historyFile(pollId)
       if Files.exists(path) then
-        val content = new String(Files.readAllBytes(path))
-        content.parseJson.convertTo[PollHistory]
+        decode[PollHistory](new String(Files.readAllBytes(path))).toTry.get
       else
         PollHistory(version = "1", pollId = pollId, pollTitle = "", snapshots = List.empty)
     }
@@ -37,7 +36,7 @@ object HistoryService:
         pollTitle = pollTitle,
         snapshots = (snapshot :: existing.snapshots).sortBy(_.timestamp)
       )
-      Files.write(historyFile(pollId), updated.toJson.prettyPrint.getBytes)
+      Files.write(historyFile(pollId), updated.asJson.spaces2.getBytes)
     }
 
   def mergeAndSave(pollId: String, pollTitle: String, incoming: PollHistory): Try[PollHistory] =
@@ -57,7 +56,7 @@ object HistoryService:
           .toList
           .sortBy(_.timestamp)
       )
-      Files.write(historyFile(pollId), merged.toJson.prettyPrint.getBytes)
+      Files.write(historyFile(pollId), merged.asJson.spaces2.getBytes)
       merged
     }
 

@@ -1,28 +1,23 @@
 package services
 
 import models.User
-import spray.json._
+import io.circe.parser.decode
+import io.circe.syntax._
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import scala.util.{Try, Failure}
 
 object UserService:
   private val usersFile = "users.json"
 
-  private object Fmt extends DefaultJsonProtocol:
-    implicit val userFormat: RootJsonFormat[User] = jsonFormat4(User.apply)
-  import Fmt._
-
   private def readUsers(): List[User] =
     val path = Paths.get(usersFile)
     if !Files.exists(path) then List.empty
-    else
-      Try(new String(Files.readAllBytes(path)).parseJson.convertTo[List[User]])
-        .getOrElse(List.empty)
+    else decode[List[User]](new String(Files.readAllBytes(path))).getOrElse(List.empty)
 
   private def writeUsers(users: List[User]): Try[Unit] = Try {
     Files.write(
       Paths.get(usersFile),
-      users.toJson.prettyPrint.getBytes,
+      users.asJson.spaces2.getBytes,
       StandardOpenOption.CREATE,
       StandardOpenOption.TRUNCATE_EXISTING
     )

@@ -1,45 +1,38 @@
 package services
 
 import models._
-import spray.json._
-import json.JsonFormats._
-import java.nio.file.{Files, Paths, Path, StandardOpenOption}
+import io.circe.parser.decode
+import io.circe.syntax._
+import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.io.File
-import scala.util.{Try, Success, Failure}
-import scala.jdk.CollectionConverters._
+import scala.util.Try
 
 object TemplateService:
   private val templatesDir = "poll-templates"
-  
-  // Initialize templates directory
+
   def init(): Unit =
     val dir = new File(templatesDir)
     if !dir.exists() then
       dir.mkdirs()
       println(s"Created templates directory: ${dir.getAbsolutePath}")
-  
-  // Save poll as template
+
   def saveTemplate(poll: PollResponse): Try[String] =
     Try {
       init()
       val fileName = s"${poll.id}_${System.currentTimeMillis()}.json"
       val filePath = Paths.get(templatesDir, fileName)
-      
-      val jsonContent = poll.toJson.prettyPrint
-      Files.write(filePath, jsonContent.getBytes, StandardOpenOption.CREATE)
-      
+      Files.write(filePath, poll.asJson.spaces2.getBytes, StandardOpenOption.CREATE)
       println(s"Saved poll template: ${filePath.toString}")
       fileName
     }
-  
+
   private def parseTemplateFile(file: File): Option[PollTemplate] =
     Try {
       val content = new String(Files.readAllBytes(file.toPath))
-      val poll    = content.parseJson.convertTo[PollResponse]
+      val poll    = decode[PollResponse](content).toTry.get
       PollTemplate(file.getName, poll.id, poll.title, file.lastModified(), poll)
     }.toOption
 
-  // List all templates
   def listTemplates(): Try[List[PollTemplate]] =
     Try {
       init()
@@ -52,16 +45,14 @@ object TemplateService:
           .toList
           .sortBy(-_.savedAt)
     }
-  
-  // Load template by filename
+
   def loadTemplate(fileName: String): Try[PollResponse] =
     Try {
       val filePath = Paths.get(templatesDir, fileName)
-      val content = new String(Files.readAllBytes(filePath))
-      content.parseJson.convertTo[PollResponse]
+      val content  = new String(Files.readAllBytes(filePath))
+      decode[PollResponse](content).toTry.get
     }
-  
-  // Delete template file
+
   def deleteTemplate(fileName: String): Try[Boolean] =
     Try {
       val filePath = Paths.get(templatesDir, fileName)
