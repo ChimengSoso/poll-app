@@ -86,8 +86,8 @@ export const pollApi = {
   reopenPoll: (pollId: string, password: string): Promise<Poll> =>
     request<Poll>(`/polls/${pollId}/reopen`, { method: 'POST', body: JSON.stringify({ password }) }),
 
-  forceReset: (pollId: string): Promise<Poll> =>
-    request<Poll>(`/polls/${pollId}/force-reset`, { method: 'POST' }),
+  forceReset: (pollId: string, password: string): Promise<Poll> =>
+    request<Poll>(`/polls/${pollId}/force-reset`, { method: 'POST', body: JSON.stringify({ password }) }),
 };
 
 export const templateApi = {

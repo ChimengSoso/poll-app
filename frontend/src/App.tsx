@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Layout, Tabs, Typography, Button, Badge } from 'antd';
+import { Layout, Tabs, Dropdown, Badge } from 'antd';
 import { LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import { UserProvider, useUser } from './contexts/UserContext';
 import { Login } from './components/Login';
@@ -15,7 +15,6 @@ import { authUpdateService } from './services/authUpdateService';
 import type { Poll } from './types';
 
 const { Header, Content } = Layout;
-const { Title } = Typography;
 
 function MainApp() {
   const { username, logout } = useUser();
@@ -24,7 +23,6 @@ function MainApp() {
   const [selectedPoll, setSelectedPoll] = useState<Poll | null>(null);
   const [activeTab, setActiveTab] = useState('1');
   const [pendingResetsCount, setPendingResetsCount] = useState(0);
-  const [historyCount, setHistoryCount] = useState(0);
 
   useEffect(() => {
     if (!selectedPoll) return;
@@ -70,7 +68,6 @@ function MainApp() {
 
   const handlePollSelect = (poll: Poll) => {
     setSelectedPoll(poll);
-    setHistoryCount(0);
     setActiveTab('2');
   };
 
@@ -84,7 +81,6 @@ function MainApp() {
     if (activeTab === '2' && !selectedPoll) setActiveTab('1');
     if (activeTab === '3' && (!selectedPoll || selectedPoll.totalVotes === 0)) setActiveTab('1');
     if (activeTab === '5' && pendingResetsCount === 0) setActiveTab('1');
-    if (activeTab === '6' && !selectedPoll) setActiveTab('1');
   }, [selectedPoll, pendingResetsCount, activeTab]);
 
   const tabItems = [
@@ -128,13 +124,11 @@ function MainApp() {
         children: <PendingResets onCountChange={setPendingResetsCount} />,
       },
     ] : []),
-    ...(selectedPoll ? [
-      {
-        key: '6',
-        label: 'History',
-        children: <PollHistory poll={selectedPoll} onHistoryCount={setHistoryCount} />,
-      },
-    ] : []),
+    {
+      key: '6',
+      label: 'History',
+      children: <PollHistory />,
+    },
   ];
 
   return (
@@ -146,17 +140,35 @@ function MainApp() {
         justifyContent: 'space-between',
         alignItems: 'center',
       }}>
-        <Title level={2} style={{ color: 'white', margin: '16px 0' }}>
-          🗳️ OpenPoll
-        </Title>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <span style={{ color: 'white' }}>
-            <UserOutlined /> {username}
+        <div onClick={() => setActiveTab('1')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, margin: '16px 0' }}>
+          <span style={{ fontSize: 26 }}>🗳️</span>
+          <span style={{
+            fontSize: 26,
+            fontWeight: 800,
+            letterSpacing: '0.08em',
+            background: 'linear-gradient(90deg, #fff 0%, #fadb14 40%, #fff 70%, #fadb14 100%)',
+            backgroundSize: '200% auto',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            textTransform: 'uppercase',
+            animation: 'mirror-flash 3s linear infinite',
+          }}>
+            OpenPoll
           </span>
-          <Button icon={<LogoutOutlined />} onClick={logout} type="default">
-            Logout
-          </Button>
         </div>
+        <Dropdown
+          menu={{
+            items: [{ key: 'logout', icon: <LogoutOutlined />, label: 'Logout', danger: true }],
+            onClick: ({ key }) => { if (key === 'logout') logout(); },
+          }}
+          trigger={['click']}
+        >
+          <div className="user-badge">
+            <UserOutlined style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }} />
+            <span style={{ color: 'white', fontWeight: 500, fontSize: 14, letterSpacing: '0.04em' }}>{username}</span>
+          </div>
+        </Dropdown>
       </Header>
       <Content style={{ padding: '24px', background: '#f0f2f5' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>

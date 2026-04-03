@@ -229,23 +229,29 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
         path(Segment / "force-reset") { pollId =>
           post {
             authenticated { username =>
-              val getResponse: Future[PollManager.GetPollResponse] =
-                pollManager.ask(PollManager.GetPoll(pollId, _))
-              onSuccess(getResponse) {
-                case PollManager.PollFound(poll) =>
-                  if poll.createdBy != username then
-                    complete(StatusCodes.Forbidden, ErrorResponse("Only the poll owner can force reset this poll"))
-                  else if !poll.dailyReset then
-                    complete(StatusCodes.BadRequest, ErrorResponse("This poll does not have daily reset enabled"))
-                  else
-                    val response: Future[PollManager.EditPollResponse] =
-                      pollManager.ask(PollManager.ForceResetPollCmd(pollId, _))
-                    onSuccess(response) {
-                      case PollManager.EditSuccess(updated) => complete(StatusCodes.OK, updated)
-                      case PollManager.EditFailure(message) => complete(StatusCodes.BadRequest, ErrorResponse(message))
-                    }
-                case PollManager.PollNotFound(message) =>
-                  complete(StatusCodes.NotFound, ErrorResponse(message))
+              entity(as[ReopenRequest]) { req =>
+                val getResponse: Future[PollManager.GetPollResponse] =
+                  pollManager.ask(PollManager.GetPoll(pollId, _))
+                onSuccess(getResponse) {
+                  case PollManager.PollFound(poll) =>
+                    if poll.createdBy != username then
+                      complete(StatusCodes.Forbidden, ErrorResponse("Only the poll owner can force reset this poll"))
+                    else if !poll.dailyReset then
+                      complete(StatusCodes.BadRequest, ErrorResponse("This poll does not have daily reset enabled"))
+                    else
+                      services.UserService.findUser(username) match
+                        case Some(user) if services.AuthService.verifyPassword(req.password, user.passwordHash, user.salt) =>
+                          val response: Future[PollManager.EditPollResponse] =
+                            pollManager.ask(PollManager.ForceResetPollCmd(pollId, _))
+                          onSuccess(response) {
+                            case PollManager.EditSuccess(updated) => complete(StatusCodes.OK, updated)
+                            case PollManager.EditFailure(message) => complete(StatusCodes.BadRequest, ErrorResponse(message))
+                          }
+                        case _ =>
+                          complete(StatusCodes.Unauthorized, ErrorResponse("Incorrect password"))
+                  case PollManager.PollNotFound(message) =>
+                    complete(StatusCodes.NotFound, ErrorResponse(message))
+                }
               }
             }
           }
@@ -349,6 +355,27 @@ class PollRoutes(pollManager: ActorRef[PollManager.Command], authenticated: Dire
                   complete(StatusCodes.OK, DeleteSuccessResponse(message))
                 case PollManager.DeleteFailure(message) =>
                   complete(StatusCodes.NotFound, ErrorResponse(message))
+              }
+            }
+          }
+        }
+      } ~
+      pathPrefix("api" / "history") {
+        pathEnd {
+          get {
+            HistoryService.listAllHistories() match
+              case Success(histories) => complete(StatusCodes.OK, histories)
+              case Failure(ex)        => complete(StatusCodes.InternalServerError, ErrorResponse(ex.getMessage))
+          } ~
+          post {
+            authenticated { _ =>
+              entity(as[List[PollHistory]]) { incoming =>
+                val merged = incoming.flatMap { h =>
+                  HistoryService.mergeAndSave(h.pollId, h.pollTitle, h).toOption
+                }
+                HistoryService.listAllHistories() match
+                  case Success(all) => complete(StatusCodes.OK, all)
+                  case Failure(ex)  => complete(StatusCodes.InternalServerError, ErrorResponse(ex.getMessage))
               }
             }
           }

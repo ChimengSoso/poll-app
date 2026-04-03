@@ -307,7 +307,7 @@ object PollActor:
 
         case ForceReset(replyTo) =>
           val withClearedDate = poll.copy(lastResetDate = None)
-          val reset = applyDailyReset(withClearedDate)
+          val reset = applyDailyReset(withClearedDate).copy(active = true)
           replyTo ! EditSuccess(toPollResponse(reset))
           active(reset)
     }

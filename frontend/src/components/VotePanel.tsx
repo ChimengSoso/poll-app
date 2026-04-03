@@ -22,6 +22,9 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
   const [requesting, setRequesting] = useState(false);
   const [closing, setClosing] = useState(false);
   const [forceResetting, setForceResetting] = useState(false);
+  const [forceResetModalVisible, setForceResetModalVisible] = useState(false);
+  const [forceResetPassword, setForceResetPassword] = useState('');
+  const [forceResetError, setForceResetError] = useState('');
   const [reopenModalVisible, setReopenModalVisible] = useState(false);
   const [reopenPassword, setReopenPassword] = useState('');
   const [reopenLoading, setReopenLoading] = useState(false);
@@ -95,11 +98,14 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
   const handleForceReset = async () => {
     try {
       setForceResetting(true);
-      const updatedPoll = await pollApi.forceReset(poll.id);
+      setForceResetError('');
+      const updatedPoll = await pollApi.forceReset(poll.id, forceResetPassword);
       message.success('Daily reset applied!');
       onVoteSuccess(updatedPoll);
+      setForceResetModalVisible(false);
+      setForceResetPassword('');
     } catch (error: any) {
-      message.error(error.message || 'Failed to force reset');
+      setForceResetError(error.message || 'Failed to force reset');
     } finally {
       setForceResetting(false);
     }
@@ -339,20 +345,13 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
                 </Button>
               </Popconfirm>
               {poll.dailyReset && (
-                <Popconfirm
-                  title="Force daily reset now?"
-                  description="This will reset votes and update the title as if today is a new day."
-                  onConfirm={handleForceReset}
-                  okText="Yes, force reset"
-                  cancelText="Cancel"
+                <Button
+                  icon={<ReloadOutlined />}
+                  loading={forceResetting}
+                  onClick={() => { setForceResetPassword(''); setForceResetError(''); setForceResetModalVisible(true); }}
                 >
-                  <Button
-                    icon={<ReloadOutlined />}
-                    loading={forceResetting}
-                  >
-                    Force Daily Reset
-                  </Button>
-                </Popconfirm>
+                  Force Daily Reset
+                </Button>
               )}
             </>
           )}
@@ -525,6 +524,28 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
         />
         {reopenError && (
           <Alert message={reopenError} type="error" showIcon style={{ marginTop: 8 }} />
+        )}
+      </Modal>
+
+      <Modal
+        title="Force Daily Reset"
+        open={forceResetModalVisible}
+        onOk={handleForceReset}
+        onCancel={() => setForceResetModalVisible(false)}
+        confirmLoading={forceResetting}
+        okText="Reset Now"
+      >
+        <p>This will reset all votes, update the title to today's date, and reopen the poll. Enter your password to confirm.</p>
+        <Input.Password
+          prefix={<LockOutlined />}
+          placeholder="Your password"
+          value={forceResetPassword}
+          onChange={e => { setForceResetPassword(e.target.value); setForceResetError(''); }}
+          onPressEnter={handleForceReset}
+          autoFocus
+        />
+        {forceResetError && (
+          <Alert message={forceResetError} type="error" showIcon style={{ marginTop: 8 }} />
         )}
       </Modal>
     </Card>

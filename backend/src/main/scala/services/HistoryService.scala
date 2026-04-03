@@ -60,6 +60,24 @@ object HistoryService:
       merged
     }
 
+  def listAllHistories(): Try[List[PollHistory]] =
+    Try {
+      init()
+      val dir = new java.io.File(historyDir)
+      if !dir.exists() then List.empty
+      else
+        dir.listFiles()
+          .filter(_.getName.endsWith(".json"))
+          .flatMap { file =>
+            scala.util.Try {
+              decode[PollHistory](new String(Files.readAllBytes(file.toPath))).toTry.get
+            }.toOption
+          }
+          .filter(_.snapshots.nonEmpty)
+          .toList
+          .sortBy(h => -h.snapshots.map(_.timestamp).max)
+    }
+
   def deleteHistory(pollId: String): Try[Unit] =
     Try {
       val path = historyFile(pollId)

@@ -5,3 +5,30 @@
   font-style: normal;
   font-variation-settings: "wdth" 100;
 }
+
+@keyframes mirror-flash {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.user-badge {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.user-badge:hover {
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.6) 50%,
+    transparent 70%
+  );
+  background-size: 200% auto;
+  animation: mirror-flash 0.6s linear;
+}

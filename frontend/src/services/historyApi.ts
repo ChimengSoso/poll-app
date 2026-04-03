@@ -26,6 +26,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const historyApi = {
+  getAllHistories: (): Promise<PollHistory[]> =>
+    request<PollHistory[]>('/history'),
+
+  importAllHistories: (data: PollHistory[]): Promise<PollHistory[]> =>
+    request<PollHistory[]>('/history', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   getHistory: (pollId: string): Promise<PollHistory> =>
     request<PollHistory>(`/polls/${pollId}/history`),
 
