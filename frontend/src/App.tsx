@@ -14,6 +14,8 @@ import { PendingResets } from './components/PendingResets';
 import { PollHistory } from './components/PollHistory';
 import { pollUpdateService } from './services/pollUpdateService';
 import { authUpdateService } from './services/authUpdateService';
+import { authApi } from './services/authApi';
+import { templateApi } from './services/api';
 import type { Poll } from './types';
 
 function MainApp() {
@@ -21,6 +23,7 @@ function MainApp() {
   const [guideVisible, setGuideVisible] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [templateRefreshTrigger, setTemplateRefreshTrigger] = useState(0);
+  const [templateCount, setTemplateCount] = useState(0);
   const [selectedPoll, setSelectedPoll] = useState<Poll | null>(null);
   const [activeTab, setActiveTab] = useState('1');
   const [pendingResetsCount, setPendingResetsCount] = useState(0);
@@ -45,20 +48,35 @@ function MainApp() {
     const unsubscribe = pollUpdateService.subscribe((updatedPoll) => {
       if (updatedPoll.deleted || updatedPoll.id === '__template_updated__') {
         setTemplateRefreshTrigger((prev) => prev + 1);
+        // Fetch count directly because TemplateList may not be mounted (tab hidden when count=0)
+        templateApi.getAllTemplates()
+          .then(templates => setTemplateCount(templates.length))
+          .catch(() => {});
       }
     });
     return () => unsubscribe();
+  }, []);
+
+  // Fetch initial pending count on login (for users who join after a request was created)
+  useEffect(() => {
+    authApi.getPendingResets()
+      .then(resets => setPendingResetsCount(resets.filter(r => r.status === 'pending').length))
+      .catch(() => {});
+  }, []);
+
+  // Fetch initial template count so Recycle Bin tab shows/hides correctly on first load
+  useEffect(() => {
+    templateApi.getAllTemplates()
+      .then(templates => setTemplateCount(templates.length))
+      .catch(() => {});
   }, []);
 
   // Keep badge count updated via SSE
   useEffect(() => {
     const unsubscribe = authUpdateService.subscribe((event) => {
       if (event.type === 'reset-update') {
-        setPendingResetsCount((prev) => {
-          // Only increment if it's a new request ID not yet counted
-          return prev; // actual count managed by PendingResets component
-        });
-      } else if (event.type === 'reset-approved') {
+        setPendingResetsCount((prev) => Math.max(prev, 1));
+      } else if (event.type === 'reset-approved' || event.type === 'reset-cancelled') {
         setPendingResetsCount((prev) => Math.max(0, prev - 1));
       }
     });
@@ -81,8 +99,9 @@ function MainApp() {
   useEffect(() => {
     if (activeTab === '2' && !selectedPoll) setActiveTab('1');
     if (activeTab === '3' && (!selectedPoll || selectedPoll.totalVotes === 0)) setActiveTab('1');
+    if (activeTab === '4' && templateCount === 0) setActiveTab('1');
     if (activeTab === '5' && pendingResetsCount === 0) setActiveTab('1');
-  }, [selectedPoll, pendingResetsCount, activeTab]);
+  }, [selectedPoll, templateCount, pendingResetsCount, activeTab]);
 
   const tabItems = [
     {
@@ -109,11 +128,11 @@ function MainApp() {
         children: <Results poll={selectedPoll} />,
       },
     ] : []),
-    {
+    ...(templateCount > 0 ? [{
       key: '4',
       label: 'Recycle Bin',
-      children: <TemplateList onTemplateRecover={handlePollCreated} refreshTrigger={templateRefreshTrigger} />,
-    },
+      children: <TemplateList onTemplateRecover={handlePollCreated} refreshTrigger={templateRefreshTrigger} onCountChange={setTemplateCount} />,
+    }] : []),
     ...(pendingResetsCount > 0 ? [
       {
         key: '5',
@@ -207,7 +226,10 @@ function MainApp() {
           <Paragraph>The owner can close a poll to stop voting. Re-opening requires password confirmation. Every close is recorded in History.</Paragraph>
 
           <Title level={5}>📜 History</Title>
-          <Paragraph>Every time a poll is closed, a snapshot is saved. History persists even after the poll is deleted. You can export and import history as a JSON file.</Paragraph>
+          <Paragraph>
+            Every time a poll is closed, a snapshot is saved. History persists even after the poll is deleted. You can export and import history as a JSON file.<br />
+            To <Text strong>delete a snapshot</Text>, any user (except the poll closer) can click the delete icon to cast a vote. The required votes equal the <Text strong>winner's vote count</Text> in that snapshot. The user who <Text strong>closed the poll</Text> cannot vote — they can only approve the deletion once the threshold is reached.
+          </Paragraph>
 
           <Title level={5}>🗑️ Recycle Bin</Title>
           <Paragraph>Deleted polls are moved here. You can restore (recover) them back as active polls, or permanently delete them.</Paragraph>

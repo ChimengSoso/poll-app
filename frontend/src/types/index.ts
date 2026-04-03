@@ -102,6 +102,17 @@ export interface PollHistory {
   snapshots: PollSnapshot[];
 }
 
+export interface DeleteHistoryStatus {
+  requestId: string;
+  pollId: string;
+  snapshotId: string;
+  closedBy: string;
+  threshold: number;
+  votes: number;
+  voters: string[];
+  ready: boolean;
+}
+
 export interface ResetStatusResponse {
   requestId: string;
   username: string;

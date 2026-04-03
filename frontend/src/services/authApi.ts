@@ -1,4 +1,4 @@
-import type { ResetStatusResponse } from '../types';
+import type { ResetStatusResponse, DeleteHistoryStatus } from '../types';
 
 const API_BASE = '/api/auth';
 
@@ -48,4 +48,22 @@ export const authApi = {
 
   getPendingResets: (): Promise<ResetStatusResponse[]> =>
     request('/pending-resets'),
+
+  cancelResetRequest: (requestId: string): Promise<void> =>
+    request(`/reset-request/${requestId}`, { method: 'DELETE' }),
+
+  getDeleteHistoryRequests: (): Promise<DeleteHistoryStatus[]> =>
+    request('/history-delete'),
+
+  voteDeleteHistory: (pollId: string, snapshotId: string): Promise<DeleteHistoryStatus> =>
+    request('/history-delete', { method: 'POST', body: JSON.stringify({ pollId, snapshotId }) }),
+
+  unvoteDeleteHistory: (requestId: string): Promise<DeleteHistoryStatus> =>
+    request(`/history-delete/${requestId}/vote`, { method: 'DELETE' }),
+
+  approveDeleteHistory: (requestId: string): Promise<void> =>
+    request(`/history-delete/${requestId}/approve`, { method: 'POST' }),
+
+  rejectDeleteHistory: (requestId: string): Promise<void> =>
+    request(`/history-delete/${requestId}/reject`, { method: 'POST' }),
 };

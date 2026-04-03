@@ -42,12 +42,12 @@ export const PendingResets: React.FC<PendingResetsProps> = ({ onCountChange }) =
       if (event.type === 'reset-update') {
         setResets((prev) => {
           const exists = prev.find((r) => r.requestId === event.data.requestId);
-          if (exists) {
-            return prev.map((r) => r.requestId === event.data.requestId ? event.data : r);
-          }
-          return [...prev, event.data];
+          const updated = exists
+            ? prev.map((r) => r.requestId === event.data.requestId ? event.data : r)
+            : [...prev, event.data];
+          onCountChange?.(updated.filter(r => r.status === 'pending').length);
+          return updated;
         });
-        onCountChange?.(resets.length);
       } else if (event.type === 'reset-approved') {
         setResets((prev) => {
           const updated = prev.filter((r) => r.requestId !== event.data.requestId);
@@ -55,6 +55,12 @@ export const PendingResets: React.FC<PendingResetsProps> = ({ onCountChange }) =
           return updated;
         });
         message.success(`Password reset for ${event.data.username} has been approved!`);
+      } else if (event.type === 'reset-cancelled') {
+        setResets((prev) => {
+          const updated = prev.filter((r) => r.requestId !== event.data.requestId);
+          onCountChange?.(updated.length);
+          return updated;
+        });
       }
     });
 

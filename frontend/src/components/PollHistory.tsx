@@ -1,17 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, Button, Space, Table, Tag, Typography, Empty, message, Progress } from 'antd';
-import { DownloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { Card, Button, Space, Table, Tag, Typography, Empty, message, Progress, Tooltip, Popconfirm } from 'antd';
+import { DownloadOutlined, UploadOutlined, DeleteOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { historyApi } from '../services/historyApi';
+import { authApi } from '../services/authApi';
+import { authUpdateService } from '../services/authUpdateService';
 import { pollUpdateService } from '../services/pollUpdateService';
-import type { PollHistory as PollHistoryType, PollSnapshot, ChoiceSummary } from '../types';
+import { useUser } from '../contexts/UserContext';
+import type { PollHistory as PollHistoryType, PollSnapshot, ChoiceSummary, DeleteHistoryStatus } from '../types';
 
 const { Text } = Typography;
 
 export const PollHistory: React.FC = () => {
+  const { username } = useUser();
   const [histories, setHistories] = useState<PollHistoryType[]>([]);
+  const [deleteRequests, setDeleteRequests] = useState<Record<string, DeleteHistoryStatus>>({});
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [voting, setVoting] = useState<string | null>(null);
+  const [unvoting, setUnvoting] = useState<string | null>(null);
+  const [approving, setApproving] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<string | null>(null);
   const [expandedPollId, setExpandedPollId] = useState<string | null>(null);
   const [expandedSnapshotId, setExpandedSnapshotId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -36,6 +45,43 @@ export const PollHistory: React.FC = () => {
     return pollUpdateService.subscribe((poll) => {
       if (!poll.active && poll.id !== '__template_updated__') {
         loadHistories();
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    authApi.getDeleteHistoryRequests()
+      .then(list => {
+        const map: Record<string, DeleteHistoryStatus> = {};
+        list.forEach(r => { map[r.snapshotId] = r; });
+        setDeleteRequests(map);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    return authUpdateService.subscribe((event) => {
+      if (event.type === 'history-delete-update') {
+        setDeleteRequests(prev => ({ ...prev, [event.data.snapshotId]: event.data }));
+      } else if (event.type === 'history-delete-done') {
+        setDeleteRequests(prev => {
+          const next = { ...prev };
+          delete next[event.data.snapshotId];
+          return next;
+        });
+        setHistories(prev => prev
+          .map(h => h.pollId !== event.data.pollId ? h : {
+            ...h,
+            snapshots: h.snapshots.filter(s => s.snapshotId !== event.data.snapshotId)
+          })
+          .filter(h => h.snapshots.length > 0)
+        );
+      } else if (event.type === 'history-delete-rejected') {
+        setDeleteRequests(prev => {
+          const next = { ...prev };
+          delete next[event.data.snapshotId];
+          return next;
+        });
       }
     });
   }, []);
@@ -138,6 +184,148 @@ export const PollHistory: React.FC = () => {
     },
   ];
 
+  const handleDeleteVote = async (pollId: string, snapshotId: string) => {
+    setVoting(snapshotId);
+    try {
+      const updated = await authApi.voteDeleteHistory(pollId, snapshotId);
+      setDeleteRequests(prev => ({ ...prev, [snapshotId]: updated }));
+    } catch (error: any) {
+      message.error(error.message || 'Failed to vote');
+    } finally {
+      setVoting(null);
+    }
+  };
+
+  const handleUnvote = async (requestId: string, snapshotId: string) => {
+    setUnvoting(requestId);
+    try {
+      const updated = await authApi.unvoteDeleteHistory(requestId);
+      setDeleteRequests(prev => ({ ...prev, [snapshotId]: updated }));
+    } catch (error: any) {
+      message.error(error.message || 'Failed to cancel vote');
+    } finally {
+      setUnvoting(null);
+    }
+  };
+
+  const handleRejectDelete = async (requestId: string, snapshotId: string) => {
+    setRejecting(requestId);
+    try {
+      await authApi.rejectDeleteHistory(requestId);
+      message.info('Deletion request rejected.');
+    } catch (error: any) {
+      message.error(error.message || 'Failed to reject deletion');
+    } finally {
+      setRejecting(null);
+    }
+  };
+
+  const handleApproveDelete = async (requestId: string, snapshotId: string) => {
+    setApproving(requestId);
+    try {
+      await authApi.approveDeleteHistory(requestId);
+      message.success('Snapshot deleted.');
+    } catch (error: any) {
+      message.error(error.message || 'Failed to approve deletion');
+    } finally {
+      setApproving(null);
+    }
+  };
+
+  const renderDeleteAction = (snapshot: PollSnapshot, pollId: string) => {
+    const req = deleteRequests[snapshot.snapshotId];
+    const isOwner = username === snapshot.closedBy;
+
+    if (!req) {
+      if (isOwner) return null; // owner can't initiate — waits for others to vote
+      return (
+        <Tooltip title="Request deletion (requires votes)">
+          <Button
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            loading={voting === snapshot.snapshotId}
+            onClick={e => { e.stopPropagation(); handleDeleteVote(pollId, snapshot.snapshotId); }}
+          />
+        </Tooltip>
+      );
+    }
+
+    const alreadyVoted = username ? req.voters.includes(username) : false;
+    const pct = Math.round((req.votes / req.threshold) * 100);
+    return (
+      <Space size={4} onClick={e => e.stopPropagation()}>
+        {req.votes > 0 && (
+          <Progress
+            percent={pct}
+            format={() => `${req.votes}/${req.threshold}`}
+            size="small"
+            style={{ width: 100, marginBottom: 0 }}
+            status={req.ready ? 'success' : 'active'}
+          />
+        )}
+        {isOwner && req.ready ? (
+          <>
+            <Popconfirm
+              title="Permanently delete this snapshot?"
+              onConfirm={() => handleApproveDelete(req.requestId, snapshot.snapshotId)}
+              okText="Delete"
+              okButtonProps={{ danger: true }}
+            >
+              <Button
+                size="small"
+                type="primary"
+                danger
+                icon={<CheckCircleOutlined />}
+                loading={approving === req.requestId}
+              >
+                Approve
+              </Button>
+            </Popconfirm>
+            <Popconfirm
+              title="Reject this deletion request?"
+              onConfirm={() => handleRejectDelete(req.requestId, snapshot.snapshotId)}
+              okText="Reject"
+            >
+              <Button
+                size="small"
+                loading={rejecting === req.requestId}
+              >
+                Reject
+              </Button>
+            </Popconfirm>
+          </>
+        ) : isOwner ? (
+          <Popconfirm
+            title="Reject this deletion request?"
+            onConfirm={() => handleRejectDelete(req.requestId, snapshot.snapshotId)}
+            okText="Reject"
+          >
+            <Button size="small" loading={rejecting === req.requestId}>Reject</Button>
+          </Popconfirm>
+        ) : alreadyVoted ? (
+          <Button
+            size="small"
+            loading={unvoting === req.requestId}
+            onClick={() => handleUnvote(req.requestId, snapshot.snapshotId)}
+          >
+            Cancel Vote
+          </Button>
+        ) : (
+          <Tooltip title="Vote for deletion">
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              loading={voting === snapshot.snapshotId}
+              onClick={() => handleDeleteVote(pollId, snapshot.snapshotId)}
+            />
+          </Tooltip>
+        )}
+      </Space>
+    );
+  };
+
   const renderSnapshotDetail = (snapshot: PollSnapshot) => (
     <div style={{ padding: '12px 4px 16px', borderBottom: '1px solid #f0f0f0' }}>
       <Space style={{ marginBottom: 8 }}>
@@ -193,6 +381,7 @@ export const PollHistory: React.FC = () => {
                     <Text style={{ flex: 1 }}>{pollLabel}</Text>
                     <Text type="secondary" style={{ whiteSpace: 'nowrap' }}>{formatDate(latest.timestamp)}</Text>
                     {winnerTag(latest)}
+                    {renderDeleteAction(latest, history.pollId)}
                   </div>
                   {isSnapExpanded && renderSnapshotDetail(latest)}
                 </div>
@@ -217,6 +406,7 @@ export const PollHistory: React.FC = () => {
                             <Text type="secondary" style={{ minWidth: 24 }}>#{snapshots.length - idx}</Text>
                             <Text type="secondary" style={{ flex: 1, whiteSpace: 'nowrap' }}>{formatDate(snapshot.timestamp)}</Text>
                             {winnerTag(snapshot)}
+                            {renderDeleteAction(snapshot, history.pollId)}
                           </div>
                           {isSnapExpanded && renderSnapshotDetail(snapshot)}
                         </div>

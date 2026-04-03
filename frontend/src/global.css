@@ -11,6 +11,18 @@
   100% { background-position: 200% center; }
 }
 
+.ant-table,
+.ant-table td,
+.ant-table th,
+.ant-table .ant-table-cell,
+.ant-tag,
+.ant-typography,
+.ant-typography p,
+.ant-typography span,
+.ant-space-item {
+  font-family: "Noto Sans Thai Looped", sans-serif;
+}
+
 .ant-tabs-tab .ant-tabs-tab-btn {
   font-size: 15px;
   font-weight: 500;

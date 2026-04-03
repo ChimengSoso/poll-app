@@ -70,3 +70,22 @@ object PollHistory:
       snapshots <- c.downField("snapshots").as[List[PollSnapshot]]
     yield PollHistory(version, pollId, pollTitle, snapshots)
   }
+
+case class DeleteHistoryStatus(
+  requestId: String,
+  pollId: String,
+  snapshotId: String,
+  closedBy: String,
+  threshold: Int,
+  votes: Int,
+  voters: List[String],
+  ready: Boolean
+)
+object DeleteHistoryStatus:
+  given Encoder[DeleteHistoryStatus] = deriveEncoder
+  given Decoder[DeleteHistoryStatus] = deriveDecoder
+
+case class CreateDeleteHistoryRequest(pollId: String, snapshotId: String)
+object CreateDeleteHistoryRequest:
+  given Encoder[CreateDeleteHistoryRequest] = deriveEncoder
+  given Decoder[CreateDeleteHistoryRequest] = deriveDecoder

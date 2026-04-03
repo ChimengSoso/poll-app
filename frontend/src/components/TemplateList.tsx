@@ -11,9 +11,10 @@ import type { PollTemplate } from '../types';
 interface TemplateListProps {
   onTemplateRecover: () => void;
   refreshTrigger?: number;
+  onCountChange?: (count: number) => void;
 }
 
-export const TemplateList: React.FC<TemplateListProps> = ({ onTemplateRecover, refreshTrigger }) => {
+export const TemplateList: React.FC<TemplateListProps> = ({ onTemplateRecover, refreshTrigger, onCountChange }) => {
   const [templates, setTemplates] = useState<PollTemplate[]>([]);
   const [, setLoading] = useState(false);
 
@@ -22,6 +23,7 @@ export const TemplateList: React.FC<TemplateListProps> = ({ onTemplateRecover, r
       setLoading(true);
       const data = await templateApi.getAllTemplates();
       setTemplates(data);
+      onCountChange?.(data.length);
     } catch (error: any) {
       message.error('Failed to load recycle bin');
     } finally {
@@ -35,7 +37,10 @@ export const TemplateList: React.FC<TemplateListProps> = ({ onTemplateRecover, r
       try {
         setLoading(true);
         const data = await templateApi.getAllTemplates();
-        if (!cancelled) setTemplates(data);
+        if (!cancelled) {
+          setTemplates(data);
+          onCountChange?.(data.length);
+        }
       } catch (error: any) {
         if (!cancelled) message.error('Failed to load templates');
       } finally {

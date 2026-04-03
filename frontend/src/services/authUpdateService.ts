@@ -1,8 +1,12 @@
-import type { ResetStatusResponse } from '../types';
+import type { ResetStatusResponse, DeleteHistoryStatus } from '../types';
 
 export type ResetEvent =
   | { type: 'reset-update'; data: ResetStatusResponse }
-  | { type: 'reset-approved'; data: { requestId: string; username: string } };
+  | { type: 'reset-approved'; data: { requestId: string; username: string } }
+  | { type: 'reset-cancelled'; data: { requestId: string; username: string } }
+  | { type: 'history-delete-update'; data: DeleteHistoryStatus }
+  | { type: 'history-delete-done'; data: { requestId: string; pollId: string; snapshotId: string } }
+  | { type: 'history-delete-rejected'; data: { requestId: string; snapshotId: string } };
 
 type ResetListener = (event: ResetEvent) => void;
 
@@ -32,6 +36,42 @@ class AuthUpdateService {
         this.notify({ type: 'reset-approved', data });
       } catch (error) {
         console.error('[Auth SSE] Failed to parse reset-approved:', error);
+      }
+    });
+
+    this.eventSource.addEventListener('reset-cancelled', (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data) as { requestId: string; username: string };
+        this.notify({ type: 'reset-cancelled', data });
+      } catch (error) {
+        console.error('[Auth SSE] Failed to parse reset-cancelled:', error);
+      }
+    });
+
+    this.eventSource.addEventListener('history-delete-update', (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data) as DeleteHistoryStatus;
+        this.notify({ type: 'history-delete-update', data });
+      } catch (error) {
+        console.error('[Auth SSE] Failed to parse history-delete-update:', error);
+      }
+    });
+
+    this.eventSource.addEventListener('history-delete-done', (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data) as { requestId: string; pollId: string; snapshotId: string };
+        this.notify({ type: 'history-delete-done', data });
+      } catch (error) {
+        console.error('[Auth SSE] Failed to parse history-delete-done:', error);
+      }
+    });
+
+    this.eventSource.addEventListener('history-delete-rejected', (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data) as { requestId: string; snapshotId: string };
+        this.notify({ type: 'history-delete-rejected', data });
+      } catch (error) {
+        console.error('[Auth SSE] Failed to parse history-delete-rejected:', error);
       }
     });
 

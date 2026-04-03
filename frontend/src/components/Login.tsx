@@ -128,6 +128,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setError('');
     try {
       const { token } = await authApi.login(username, values.password);
+      // If there was a pending reset request for this user, cancel it (they remembered their pw)
+      const savedId = sessionStorage.getItem('openpoll-reset-id');
+      if (savedId) {
+        authApi.cancelResetRequest(savedId).catch(() => {});
+        sessionStorage.removeItem('openpoll-reset-id');
+        sessionStorage.removeItem('openpoll-reset-user');
+        sessionStorage.removeItem('openpoll-reset-expires');
+      }
       onLogin(username, token);
     } catch (e: any) {
       setError(e.message || 'Login failed');
@@ -369,7 +377,16 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           />
           <Text type="secondary" style={{ fontSize: 12 }}>Expires in ~{timeLeft}h</Text>
         </div>
-        <Button type="link" onClick={() => { back('forgot'); }} style={{ padding: 0 }}>
+        <Button type="link" onClick={() => {
+          if (requestId) {
+            authApi.cancelResetRequest(requestId).catch(() => {});
+            sessionStorage.removeItem('openpoll-reset-id');
+            sessionStorage.removeItem('openpoll-reset-user');
+            sessionStorage.removeItem('openpoll-reset-expires');
+            setRequestId(null);
+          }
+          back('forgot');
+        }} style={{ padding: 0 }}>
           Cancel and try again
         </Button>
       </>

@@ -83,3 +83,14 @@ object HistoryService:
       val path = historyFile(pollId)
       if Files.exists(path) then Files.delete(path)
     }
+
+  def deleteSnapshot(pollId: String, snapshotId: String): Try[Unit] =
+    Try {
+      init()
+      val path = historyFile(pollId)
+      if Files.exists(path) then
+        val history = decode[PollHistory](new String(Files.readAllBytes(path))).toTry.get
+        val updated = history.copy(snapshots = history.snapshots.filter(_.snapshotId != snapshotId))
+        if updated.snapshots.isEmpty then Files.delete(path)
+        else Files.write(path, updated.asJson.spaces2.getBytes)
+    }
