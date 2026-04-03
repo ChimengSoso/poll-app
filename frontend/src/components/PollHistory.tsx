@@ -208,7 +208,7 @@ export const PollHistory: React.FC = () => {
     }
   };
 
-  const handleRejectDelete = async (requestId: string, snapshotId: string) => {
+  const handleRejectDelete = async (requestId: string, _snapshotId: string) => {
     setRejecting(requestId);
     try {
       await authApi.rejectDeleteHistory(requestId);
@@ -220,7 +220,7 @@ export const PollHistory: React.FC = () => {
     }
   };
 
-  const handleApproveDelete = async (requestId: string, snapshotId: string) => {
+  const handleApproveDelete = async (requestId: string, _snapshotId: string) => {
     setApproving(requestId);
     try {
       await authApi.approveDeleteHistory(requestId);
