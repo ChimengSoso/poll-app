@@ -301,12 +301,14 @@ export const VotePanel: React.FC<VotePanelProps> = ({ poll, onVoteSuccess }) => 
           )}
           {isOwner && (
             <>
-              <Button
-                icon={<EditOutlined />}
-                onClick={() => setEditModalVisible(true)}
-              >
-                Edit Poll
-              </Button>
+              {poll.active && (
+                <Button
+                  icon={<EditOutlined />}
+                  onClick={() => setEditModalVisible(true)}
+                >
+                  Edit Poll
+                </Button>
+              )}
               {poll.active ? (
                 <Popconfirm
                   title="Close this poll?"

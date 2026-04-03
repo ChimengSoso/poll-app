@@ -143,7 +143,7 @@ export const PollList: React.FC<PollListProps> = ({ refreshTrigger, onPollSelect
               >
                 View/Vote
               </Button>
-              {isOwner && (
+              {isOwner && params.data?.active && (
                 <Button
                   size="small"
                   icon={<EditOutlined />}
